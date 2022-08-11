@@ -29,6 +29,7 @@ public:
 
     Plaintext decrypt_result(std::vector<seal::Ciphertext> reply);
 
+    //return a vector of ciphertext
     GSWCiphertext get_enc_sk();
 
     void test_query_expansion(PirQuery query,GaloisKeys galkey);
