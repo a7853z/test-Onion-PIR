@@ -6,6 +6,7 @@
 #include <iostream>
 using namespace std;
 void NetClient::init_client() {
+    cout<<"server ip:"<<server_ip<<" server port:"<<server_port<<endl;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(server_ip);
     server_addr.sin_port = htons(server_port);
@@ -54,3 +55,4 @@ bool NetClient::one_time_send(char * buf, uint32_t size){
     cout<<"finish sending:"<<buf<<endl;
     return true;
 }
+
