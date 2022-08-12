@@ -7,6 +7,7 @@ using namespace std;
 
 int NetServer::init_net_server() {
     //初始化
+    cout<<"server ip:"<<server_ip<<" server port:"<<server_port<<endl;
     memset(&server_addr, 0, sizeof(server_addr));
 
     server_addr.sin_family = AF_INET;
@@ -23,24 +24,22 @@ int NetServer::init_net_server() {
         cout<<"SERVER: bind success"<<endl;
     }
 
-    ret = listen(listen_fd,128);
+    ret = listen(listen_fd, 1);
     if(ret == -1) {
         cout<<"SERVER: listen error"<<endl;
         return -1;
     }
     cout<<"SERVER: listen success, listen fd:"<<listen_fd<<endl;
-    return listen_fd;
-}
-
-int NetServer::connect_client() {
     uint32_t client_addr_len = sizeof(client_addr);
     char client_ip[20];
     cout<<"listen_fd:"<<listen_fd<<endl;
+    cout<<"length"<<client_addr_len<<endl;
+
     connect_fd = accept(listen_fd, (sockaddr*)(&client_addr), &client_addr_len);
-    if(connect_fd < 0){
+    if(connect_fd<0){
         cout<<"accept error"<<endl;
-        return -1;
     }
+
     cout<<"connect_fd:"<<connect_fd<<endl;
     //输出客户端信息
     cout << "client ip:" << inet_ntoa(client_addr.sin_addr)
