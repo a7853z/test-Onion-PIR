@@ -96,122 +96,10 @@ void pir_client::compute_inverse_scales(){
         cout << "Client: logm, inverse scale, t = " << logm << ", " << inverse_scale << ", " << t << endl;
     }
 }
-PirQuery pir_client::generate_query(uint64_t desiredIndex) {
-
-    indices_ = compute_indices(desiredIndex, pir_params_.nvec);
-
-    //compute_inverse_scales();
-    GSWCiphertext packed_ct;
-    uint64_t dimension_size=FIRST_DIM;
-
-    int logsize;
-    int gap ;
-
-     int base_bits = pir_params_.plain_base;
-     int decomp_size = params_.plain_modulus().bit_count() / base_bits;
-    SecretKey sk= keygen_->secret_key();
-    auto pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
-
-    vector<vector<Ciphertext> > result(2);
-    int N = params_.poly_modulus_degree();
-
-    Plaintext pt(params_.poly_modulus_degree());
-
-    //handling first dimension first
-    for (uint32_t i = 0; i < 1; i++) {
-        uint32_t num_ptxts = ceil( (pir_params_.nvec[i] + 0.0) / N);//mostly 1
-        dimension_size= pir_params_.nvec[i];// first dimension is always 64
-        logsize = ceil(log2(dimension_size));//6
-        gap = ceil(N / (1 << logsize));//64
-        // initialize result.
-        cout << "Client: index " << i +1  <<  "/ " <<  indices_.size() << " = " << indices_[i] << endl;
-        cout << "Client: number of ctxts needed for query = " << num_ptxts << endl;
-        for (uint32_t j =0; j < num_ptxts; j++){
-            pt.set_zero();
-            if (indices_[i] > N*(j+1) || indices_[i] < N*j){
-#ifdef DEBUG
-                cout << "Client: coming here: so just encrypt zero." << endl;
-#endif
-                // just encrypt zero
-            } else{
-#ifdef DEBUG
-                cout << "Client: encrypting a real thing " << endl;
-#endif
-                uint64_t real_index = indices_[i] - N*j;
-                pt[real_index*gap] = 1;
-            }
-            //Ciphertext dest;
-
-            packed_ct.clear();
-            poc_plain_gsw_enc128(decomp_size, base_bits, newcontext_, sk, packed_ct, pt, pool, dimension_size);
-            //encryptor_->encrypt(pt, dest);
-            //dest.parms_id() = params_.parms_id();
-
-
-
-            result[i]=(packed_ct);
-
-//            Plaintext ppt;
-//            decryptor_->decrypt(result[i][2],ppt);
-//            cout<<ppt.to_string()<<endl;
-        }
-    }
-
-    int previous_dimension_size=0;
-    int new_dimension_size=0;
-    vector<uint64_t> new_indices;
-    //compressing all the remaining dimensions into one dimension of size equal to sum of remaining dimensions
-
-    if(indices_.size()>1) {
-
-        for (uint32_t i = 1; i < indices_.size(); i++) {
-
-            dimension_size = pir_params_.nvec[i];
-            uint64_t real_index = indices_[i]+new_dimension_size ;
-            new_indices.push_back(real_index);
-            //previous_dimension_size=dimension_size;
-            new_dimension_size=new_dimension_size+dimension_size;
-        }
-
-
-    pt.set_zero();
-    dimension_size= new_dimension_size;
-    logsize = ceil(log2(dimension_size));
-    gap = ceil(N / (1 << logsize));
-
-    for (uint32_t i = 0; i < new_indices.size(); i++) {
-        uint32_t num_ptxts = ceil((pir_params_.nvec[i] + 0.0) / N);
-
-        // initialize result.
-        cout << "Client: index " << i + 2 << "/ " << indices_.size() << " = " << indices_[i] << endl;
-//        cout << "Client: number of ctxts needed for query = " << num_ptxts << endl;
-        uint64_t real_index = new_indices[i];
-        pt[real_index*gap] = 1;
-
-    }
-
-    vector<Ciphertext> half_gsw_ciphertext;
-    //poc_l_pack_enc128(l, base_bit, context, sk, half_gsw_ciphertext, msg, decryptor1,  pool);
-
-    base_bits = pir_params_.gsw_base;
-    //decomp_size = newcontext_->first_context_data()->total_coeff_modulus_bit_count() / base_bits;
-    decomp_size = pir_params_.gsw_decomp_size;
-    poc_half_gsw_enc128(decomp_size, base_bits, newcontext_, sk, half_gsw_ciphertext, pt, pool, (1 << logsize));
-
-    result[1]=(half_gsw_ciphertext);
-//    Plaintext ppt;
-//   decryptor_->decrypt(result[1][0],ppt);
-//   cout<<ppt.to_string()<<endl;
-    }
-
-    return result;
-}
-
-
 
 PirQuery pir_client::generate_query_combined(uint64_t desiredIndex) {
 
-    indices_ = compute_indices(desiredIndex, pir_params_.nvec);
+    indices_ = compute_indices(desiredIndex, pir_params_.nvec);  //多維索引中的index,如nvec=(256,4)  某條對應索引（135,3)
 
     //compute_inverse_scales();
     GSWCiphertext packed_ct;
@@ -240,6 +128,9 @@ PirQuery pir_client::generate_query_combined(uint64_t desiredIndex) {
         dimension_size= 2*pir_params_.nvec[i];// first dimension is always 64
         logsize = ceil(log2(dimension_size));//8
         gap = ceil(N / (1 << logsize));//16
+        cout<<"dimension_size:"<<dimension_size<<endl;
+        cout<<"logsize:"<<logsize<<endl;
+        cout<<"gap:"<<gap<<endl;
         // initialize result.
 
 
