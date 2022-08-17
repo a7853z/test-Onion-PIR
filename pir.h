@@ -7,7 +7,7 @@
 #ifndef EXTERNAL_PROD_PIR_H
 #define EXTERNAL_PROD_PIR_H
 
-typedef vector<GSWCiphertext> PirQuery;
+typedef vector<GSWCiphertext> PirQuery;   //维度為2的密文vector, pir_reply则为1
 #define FIRST_DIM 256
 #define DIM 4
 
