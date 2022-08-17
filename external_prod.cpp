@@ -451,14 +451,9 @@ void poc_plain_gsw_enc128_combined(const uint64_t decomp_size, const uint64_t ba
                 ppt[j+p*(total_dim_with_gap)] = h;
 
             }
-
-
         }
-
-
-
-
     }
+
     Ciphertext res;
     encryptor.encrypt_symmetric(ppt,res);
     //encryptor.encrypt_zero_symmetric(res);
