@@ -41,7 +41,6 @@ int NetClient::one_time_receive(){
 
 bool NetClient::one_time_send(char * buf, uint32_t size){
     //连续发送  直到发送完
-    cout<<"connect_fd:"<<connect_fd<<endl;
     while (size>0)
     {
         int SendSize= send(connect_fd, buf, size, 0);
@@ -52,7 +51,5 @@ bool NetClient::one_time_send(char * buf, uint32_t size){
         size = size - SendSize;//用于循环发送且退出功能
         buf += SendSize;//用于计算已发buf的偏移量
     }
-    cout<<"finish sending:"<<buf<<endl;
     return true;
 }
-
