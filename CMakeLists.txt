@@ -39,10 +39,16 @@ if(NFL_OPTIMIZED)
 endif()
 
 
-add_executable(onionpir main.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir_server.h pir_server.cpp pir.cpp pir.h pir_client.cpp pir_client.h)
+add_executable(server server.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir_server.h pir_server.cpp pir.cpp pir.h NetServer.cpp NetServer.h SHA256.cpp SHA256.h)
+add_executable(client client.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir.cpp pir.h pir_client.cpp pir_client.h NetClient.cpp NetClient.h SHA256.cpp SHA256.h)
 
-target_link_libraries(onionpir PRIVATE SEAL::seal)
+target_link_libraries(server PRIVATE SEAL::seal)
 #for mac
 #target_link_libraries(external_prod PRIVATE /usr/local/lib/libnfllib.dylib)
 
-target_link_libraries(onionpir PRIVATE /usr/local/lib/libnfllib_static.a)
+target_link_libraries(server PRIVATE /usr/local/lib/libnfllib_static.a)
+target_link_libraries(client PRIVATE SEAL::seal)
+#for mac
+#target_link_libraries(external_prod PRIVATE /usr/local/lib/libnfllib.dylib)
+
+target_link_libraries(client PRIVATE /usr/local/lib/libnfllib_static.a)
