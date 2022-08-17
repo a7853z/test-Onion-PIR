@@ -15,8 +15,10 @@
 #include "external_prod.h"
 #include "util.h"
 #include "pir.h"
-#include "pir_client.h"
+#include "pir_server.h"
 #include "SHA256.h"
+#include "NetServer.h"
+#include <cassert>
 
 using namespace std;
 using namespace std::chrono;
@@ -36,11 +38,11 @@ uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 
 void process_datas(uint32_t number_of_groups){
 
-    string id_file = "../query_data.csv";
+    string id_file = "query_data.csv";
 
     //一个数组，记录每个文件的index
-    uint32_t * index = new uint32_t [90];
-    for (int i = 0; i < 90; ++i) {
+    uint32_t * index = new uint32_t [number_of_groups];
+    for (int i = 0; i < number_of_groups; ++i) {
         index[i]=0;
     }
 
@@ -49,7 +51,7 @@ void process_datas(uint32_t number_of_groups){
     ofstream write_map[number_of_groups];
     for (int i = 0; i < number_of_groups; ++i) {
         char path[40];
-        sprintf(path, "data_map_%d.data", i);
+        sprintf(path, "data_map/data_map_%d.data", i);
         write_map[i].open(path, ofstream::out|ofstream::app);
     }
 
@@ -57,7 +59,7 @@ void process_datas(uint32_t number_of_groups){
     getline(query_data, one_line); //跳过首行‘id’
     while (getline(query_data, one_line)) {
         string one_id = one_line.substr(0, 18);
-        string output = one_line.substr(19, oneline.length());
+        string output = one_line.substr(19, one_line.length());
         //如果不足23位  补齐0
         int pad_length = 23-output.length();
         if (pad_length>0){
@@ -77,33 +79,32 @@ void process_datas(uint32_t number_of_groups){
 
     //count of each data file
     ofstream count_data;
-    count_data.open("count_data.data");
+    count_data.open("data_map/count_data.data");
     for (int i = 0; i < number_of_groups; ++i) {
         count_data<< i << " " << index[i]<<endl;
     }
 }
 
-unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t &number_of_items){
-
+unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & item_number){
     cout << "id_mod:" << id_mod << endl;
 
     // read count of mod_id's data file
     ifstream read_count;
     string mod, mod_count;
     uint32_t count;
-    read_count.open("count_data.data", ifstream::in);
+    read_count.open("data_map/count_data.data", ifstream::in);
     while(read_count>>mod>>mod_count){
         if(id_mod == atoi(mod.c_str())){
             count = atoi(mod_count.c_str());
             break;
         }
     }
-    number_of_items = count;
+    item_number = count;
     read_count.close();
 
     //read data to db
     char path1[40];
-    sprintf(path1, "data_map_%d.data", id_mod);
+    sprintf(path1, "data_map/data_map_%d.data", id_mod);
     ifstream read_map;
     read_map.open(path1, ifstream::in);
     auto db(make_unique<uint8_t[]>(count * item_size));
@@ -119,16 +120,26 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t &n
 }
 
 
-int main(){
-    uint64_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
+int main(int argc, char* argv[]){
+    //啟動NetServer 如./server 127.0.0.1 10010
+    char * ip = "127.0.0.1";
+    int port = 11111;
+    if (argc > 2) {
+        ip = argv[1];
+        port = atoi(argv[2]);
+    }
+    NetServer net_server(ip, port);
+    net_server.init_net_server();
+
+    uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
     uint64_t size_per_item = 23;       //每条记录需要的占用23字节
     uint32_t N = 4096;
-    uint32_t number_of_groups = 90;
+    uint32_t number_of_groups = 95;
 
     //pre-process ids
     bool process_data = false;
     if(process_data) {
-        process_datas();
+        process_datas(number_of_groups);
     }
 
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
@@ -143,7 +154,14 @@ int main(){
     pir_server server(parms, pir_params);
 
     uint32_t id_mod; //get from client
+    uint32_t id_mod_length = net_server.one_time_receive();
+    //cout<<"receive id_mod from client, received id_mod length:"
+    //    <<id_mod_length<<" received id_mod"<<net_server.buffer<<endl;
+    assert(sizeof(id_mod)==id_mod_length);
+    memcpy(&id_mod, net_server.buffer, sizeof(id_mod));
+    cout<<"getting id_mod from client:"<<id_mod<<endl;
 
+    //本地讀取待查詢數據庫
     auto db = load_data(id_mod, size_per_item, number_of_items);
 
     auto time_pre_s = high_resolution_clock::now();
@@ -157,24 +175,61 @@ int main(){
     auto time_pre_us = duration_cast<microseconds>(time_pre_e - time_pre_s).count();
     cout << "Main: PIRServer pre-processing time: " << time_pre_us / 1000 << " ms" << endl;
 
-    //get from the client
+    //get galois keys from the client
     GaloisKeys galois_keys;
-    //get from the client
-    GSWCiphertext enc_sk;//get from the client, for query unpacking get top l rows for GSW ciphertext
-
+    //memset(galois_keys,0,sizeof(galois_keys));
+    cout<<"receive galois keys from client:"<<endl;
+    uint32_t recv_length = net_server.one_time_receive();
+    assert(recv_length == sizeof(galois_keys));
+    memcpy(&galois_keys, net_server.buffer, sizeof(galois_keys));
     server.set_galois_key(0, galois_keys); //0 represents id of a Client
 
+
+    //get enc_sk from the client
+    GSWCiphertext enc_sk;
+    //get from the client, for query unpacking get top l rows for GSW ciphertext
+    cout<<"receive enc_sk from client:"<<endl;
+    for (int i = 0; i < 14; ++i) {
+        Ciphertext ct;
+        //每次從Client接收一個密文
+        //memset(ct,0,sizeof(ct));
+        uint32_t recv_length = net_server.one_time_receive();
+        assert(recv_length == sizeof(ct));
+        memcpy(&ct, net_server.buffer, sizeof(ct));
+        enc_sk.push_back(ct);
+    }
     server.set_enc_sk(enc_sk);
 
-    PirQuery query;//get from client
+    //get query from client
+    PirQuery query;
+    //實際是query維度為2*1 後面擴展為先傳維度，再根據維度接收密文
+    cout<<"receive pir_query from client:"<<endl;
+    for (int i = 0; i < 2; ++i) {
+        GSWCiphertext query_ct;
+        Ciphertext ct;
+
+        //每次從Client接收一個密文
+        //memset(ct,0,sizeof(ct));
+        uint32_t recv_length = net_server.one_time_receive();
+        assert(recv_length == sizeof(ct));
+        memcpy(&ct, net_server.buffer, sizeof(ct));
+        query_ct.push_back(ct);
+        query.push_back(query_ct);
+    }
+
 
     auto time_server_s = high_resolution_clock::now();
     PirReply reply = server.generate_reply_combined(query, 0); // generate reply and remote it to client
+
+    //發送reply  reply只含有一個密文
+    cout<<"send pir result to client:"<<endl;
+    Ciphertext ct = reply[0];
+    net_server.one_time_send((char *)&ct, sizeof(ct));
+
     auto time_server_e = high_resolution_clock::now();
     auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
 
     cout << "Main: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
          << endl;
-
 }
 
