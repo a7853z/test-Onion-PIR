@@ -24,7 +24,7 @@ int NetServer::init_net_server() {
         cout<<"SERVER: bind success"<<endl;
     }
 
-    ret = listen(listen_fd, 1);
+    ret = listen(listen_fd, 128);
     if(ret == -1) {
         cout<<"SERVER: listen error"<<endl;
         return -1;
@@ -33,7 +33,6 @@ int NetServer::init_net_server() {
     uint32_t client_addr_len = sizeof(client_addr);
     char client_ip[20];
     cout<<"listen_fd:"<<listen_fd<<endl;
-    cout<<"length"<<client_addr_len<<endl;
 
     connect_fd = accept(listen_fd, (sockaddr*)(&client_addr), &client_addr_len);
     if(connect_fd<0){
@@ -66,7 +65,6 @@ int NetServer::one_time_receive() {
 }
 
 bool NetServer::one_time_send(char * buf, uint32_t size) {
-    cout<<"connect_fd:"<<connect_fd<<endl;
     //连续发送  直到发送完
     while (size>0)
     {
@@ -78,8 +76,8 @@ bool NetServer::one_time_send(char * buf, uint32_t size) {
         size = size - SendSize;//用于循环发送且退出功能
         buf += SendSize;//用于计算已发buf的偏移量
     }
-    cout<<"finish sending"<<endl;
     return true;
 }
+
 
 
