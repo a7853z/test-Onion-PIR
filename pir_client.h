@@ -10,13 +10,14 @@
 
 using namespace std;
 
+typedef std::vector<seal::Ciphertext> PirReply;
+
 class pir_client {
 public:
     pir_client(const seal::EncryptionParameters &parms,
               const PirParams &pirparms);
 
     GaloisKeys generate_galois_keys();
-    PirQuery generate_query(std::uint64_t desiredIndex);
 
     PirQuery generate_query_combined(std::uint64_t desiredIndex);
 
