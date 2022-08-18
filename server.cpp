@@ -144,14 +144,6 @@ int main(int argc, char* argv[]){
 
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
     uint32_t logt = 60;
-    PirParams pir_params;
-    EncryptionParameters parms(scheme_type::BFV);
-    set_bfv_parms(parms);   //N和logt在这里设置
-    gen_params( number_of_items,  size_per_item, N, logt,
-                pir_params);
-
-    cout << "Main: Initializing server." << endl;
-    pir_server server(parms, pir_params);
 
     uint32_t id_mod; //get from client
     uint32_t id_mod_length = net_server.one_time_receive();
@@ -163,6 +155,16 @@ int main(int argc, char* argv[]){
 
     //本地讀取待查詢數據庫
     auto db = load_data(id_mod, size_per_item, number_of_items);
+    
+    PirParams pir_params;
+    EncryptionParameters parms(scheme_type::BFV);
+    set_bfv_parms(parms);   //N和logt在这里设置
+    gen_params( number_of_items,  size_per_item, N, logt,
+                pir_params);
+
+    cout << "Main: Initializing server." << endl;
+    pir_server server(parms, pir_params);
+
 
     auto time_pre_s = high_resolution_clock::now();
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
