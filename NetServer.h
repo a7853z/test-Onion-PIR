@@ -26,7 +26,7 @@
 #include <fstream>
 using namespace std;
 
-#define BUFFER_SIZE 40000
+#define BUFFER_SIZE 400000
 
 class NetServer {
 public:
@@ -36,11 +36,11 @@ public:
     sockaddr_in server_addr;
     sockaddr_in client_addr;
     uint32_t sin_size, data_len;
-    char buffer[40000];  //4w字节buffer用来与client通讯
+    char buffer[BUFFER_SIZE];  //40w字节buffer用来与client通讯
     int init_net_server();  //initialize net server and listen
-    int connect_client();
-    int one_time_receive();
+    int one_time_receive(string &message);
     bool one_time_send(char * buf, uint32_t size);
+    bool send_ready = true;
     NetServer(char* ip ="127.0.0.1" , int port = 11111) {
         server_ip = ip;
         server_port = port;
