@@ -31,13 +31,13 @@ public:
     void set_enc_sk(GSWCiphertext sk_enc);
 
     void preprocess_database();
+    std::shared_ptr<seal::SEALContext> newcontext_;
 private:
     seal::EncryptionParameters params_; // SEAL parameters
     PirParams pir_params_;// PIR parameters
     parms_id_type parms_id_;
     std::unique_ptr<Database> db_;
     bool is_db_preprocessed_;
-    std::shared_ptr<seal::SEALContext> newcontext_;
     seal::GaloisKeys galoisKeys_;
     std::unique_ptr<seal::Evaluator> evaluator_;
     vector<uint64_t *> plain_decom;

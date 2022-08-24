@@ -19,6 +19,7 @@
 #include "SHA256.h"
 #include "NetClient.h"
 #include <cassert>
+#include <sstream>
 
 using namespace std;
 using namespace std::chrono;
@@ -133,7 +134,7 @@ int main(int argc, char* argv[]){
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
     uint64_t size_per_item = 23;       //每条记录需要的占用23字节
     uint32_t N = 4096;
-    uint32_t number_of_groups = 95;
+    uint32_t number_of_groups = 90;
 
 
     //pre-process ids
@@ -148,10 +149,10 @@ int main(int argc, char* argv[]){
     string query_id;
     cout<<"input a query id:"<<endl;
     cin>> query_id;
-    cout<<"query id:"<<query_id<<endl;
 
     // the query index to be queried, and assign value to number of items
     uint32_t ele_index = find_index(query_id, number_of_groups, number_of_items);
+
     while(ele_index==-1) {
         cout<<"query_id not found, enter again:"<<endl;
         cin>>query_id;
@@ -178,13 +179,19 @@ int main(int argc, char* argv[]){
     //生成Galois keys，并传给Server
     GaloisKeys galois_keys = client.generate_galois_keys();
     cout << "Client: Setting Galois keys...";
-    cout<<"sending galois_keys to server"<<endl;
-    net_client.one_time_send((char *)&galois_keys, sizeof(galois_keys));
-
-
+    cout<<"Sending galois_keys to server"<<endl;
+    stringstream galois_stream;
+    int galois_size = galois_keys.save(galois_stream);
+    string g_string = galois_stream.str();
+    const char * galois_temp = g_string.c_str();
+    net_client.one_time_send(galois_temp, galois_size);
+    //清空stream和string
+    g_string.clear();
+    galois_stream.clear();
+    galois_stream.str("");
 
     uint64_t index = client.get_fv_index(ele_index, size_per_item);   // index of FV plaintext
-    uint64_t offset = client.get_fv_offset(ele_index, size_per_item);
+    uint64_t offset = client.get_fv_offset(ele_index, size_per_item);  //offset in a plaintext
 
     cout << "Client: element index in the chosen Group = " << ele_index << " from [0, "
     << number_of_items -1 << "]" << endl;
@@ -192,37 +199,63 @@ int main(int argc, char* argv[]){
 
     //生成sk的密文，并传给server
     GSWCiphertext enc_sk=client.get_enc_sk();
-    cout<<"enc_sk size:"<<enc_sk.size()<<endl;
-    cout<<"sending enc_sk to server"<<endl;
+    cout<<"Client:enc_sk size:"<<enc_sk.size()<<endl;
+    cout<<"CLient:sending enc_sk to server"<<endl;
     for (int i = 0; i < enc_sk.size(); ++i) {
+        //测试数据vector总是14密文，所以直接发密文，如果有多个密文需要先发vector size
+        stringstream ct_stream;
         Ciphertext ct = enc_sk[i];
-        net_client.one_time_send((char *)&ct, sizeof(ct));
+        uint32_t ct_size = ct.save(ct_stream);
+        string ct_string = ct_stream.str();
+        const char * ct_temp = ct_string.c_str();
+        net_client.one_time_send(ct_temp, ct_size);
+        //清空
+        ct_string.clear();
+        ct_stream.clear();
+        ct_stream.str("");
     }
 
     auto time_query_s = high_resolution_clock::now();
     PirQuery query = client.generate_query_combined(index);
     cout<<"Client: query size = "<< query.size()<< endl;
-    cout<<"sending pir query to server"<<endl;
+    for (int i = 0; i < query.size(); ++i) {
+        cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
+    }
+    cout<<"Client: sending pir query to server"<<endl;
     //传query给server，传两个密文
     for (int i = 0; i < 2; ++i) {
+        stringstream ct_stream;
         Ciphertext ct = query[i][0];
-        net_client.one_time_send((char *)&ct, sizeof(ct));
+        uint32_t ct_size = ct.save(ct_stream);
+        string ct_string = ct_stream.str();
+        const char * ct_temp = ct_string.c_str();
+        net_client.one_time_send(ct_temp, ct_size);
+        //清空
+        ct_string.clear();
+        ct_stream.clear();
+        ct_stream.str("");
     }
-
-
     auto time_query_e = high_resolution_clock::now();
     auto time_query_us = duration_cast<microseconds>(time_query_e - time_query_s).count();
-    cout << "Main: query generated" << endl;
-    cout << "Main: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
+    cout << "Client: query generated" << endl;
+    cout << "Client: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
+
+
 
     //从server获取reply
     PirReply reply;
     Ciphertext ct;
-    cout<<"Receiving pir reply from server"<<endl;
-    uint32_t recv_length = net_client.one_time_receive();
-    assert(recv_length == sizeof(ct));
-    memcpy(&ct, net_client.buffer, sizeof(ct));
+    stringstream ct_stream;
+    string ct_string;
+    net_client.one_time_receive(ct_string);
+    ct_stream<<ct_string;
+    ct.load(client.newcontext_, ct_stream);
+    ct_stream.clear();
+    ct_stream.str("");
+    ct_string.clear();
     reply.push_back(ct);
+    cout<<"client: Receiving pir reply from server"<<endl;
+
 
     Plaintext rep= client.decrypt_result(reply);
 
@@ -234,8 +267,7 @@ int main(int argc, char* argv[]){
     for (uint32_t i = 0; i < size_per_item; ++i) {
         pt[i] = elems[(offset * size_per_item) + i];
     }
-    cout<<"Retrived data:"<<pt<<endl;
-
+    cout<<"query_id:"<<query_id<<" Retrived data:"<<pt<<endl;
     //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
 
     return 0;

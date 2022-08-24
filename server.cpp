@@ -19,6 +19,7 @@
 #include "SHA256.h"
 #include "NetServer.h"
 #include <cassert>
+#include <sstream>
 
 using namespace std;
 using namespace std::chrono;
@@ -134,7 +135,7 @@ int main(int argc, char* argv[]){
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
     uint64_t size_per_item = 23;       //每条记录需要的占用23字节
     uint32_t N = 4096;
-    uint32_t number_of_groups = 95;
+    uint32_t number_of_groups = 90;
 
     //pre-process ids
     bool process_data = false;
@@ -144,48 +145,50 @@ int main(int argc, char* argv[]){
 
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
     uint32_t logt = 60;
-
+    string g_string;
     uint32_t id_mod; //get from client
-    uint32_t id_mod_length = net_server.one_time_receive();
-    //cout<<"receive id_mod from client, received id_mod length:"
-    //    <<id_mod_length<<" received id_mod"<<net_server.buffer<<endl;
-    assert(sizeof(id_mod)==id_mod_length);
-    memcpy(&id_mod, net_server.buffer, sizeof(id_mod));
-    cout<<"getting id_mod from client:"<<id_mod<<endl;
+    net_server.one_time_receive(g_string);
+    memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
+    cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
 
     //本地讀取待查詢數據庫
+    cout<<"Server:Loading data from local files."<<endl;
     auto db = load_data(id_mod, size_per_item, number_of_items);
-    
+
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
     gen_params( number_of_items,  size_per_item, N, logt,
                 pir_params);
 
-    cout << "Main: Initializing server." << endl;
-    pir_server server(parms, pir_params);
 
+    //
+    cout << "Server: Initializing server." << endl;
+    pir_server server(parms, pir_params);
+    g_string.clear();
+    net_server.one_time_receive(g_string);
+    cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;
+    stringstream g_stream;
+    g_stream<<g_string;
+
+    GaloisKeys server_galois;
+    server_galois.load(server.newcontext_, g_stream);
+    cout << "Server: Setting Galois keys..."<<endl;
+    server.set_galois_key(0, server_galois);
+    //清空stream和string
+    g_string.clear();
+    g_stream.clear();
+    g_stream.str("");
 
     auto time_pre_s = high_resolution_clock::now();
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
     server.set_database(move(db), number_of_items, size_per_item);
-
     //plaintext decomposition
     server.preprocess_database();
 
     auto time_pre_e = high_resolution_clock::now();
     auto time_pre_us = duration_cast<microseconds>(time_pre_e - time_pre_s).count();
-    cout << "Main: PIRServer pre-processing time: " << time_pre_us / 1000 << " ms" << endl;
-
-    //get galois keys from the client
-    GaloisKeys galois_keys;
-    //memset(galois_keys,0,sizeof(galois_keys));
-    cout<<"receive galois keys from client:"<<endl;
-    uint32_t recv_length = net_server.one_time_receive();
-    assert(recv_length == sizeof(galois_keys));
-    memcpy(&galois_keys, net_server.buffer, sizeof(galois_keys));
-    server.set_galois_key(0, galois_keys); //0 represents id of a Client
-
+    cout << "Server: PIRServer data base pre-processing time: " << time_pre_us / 1000 << " ms" << endl;
 
     //get enc_sk from the client
     GSWCiphertext enc_sk;
@@ -193,14 +196,18 @@ int main(int argc, char* argv[]){
     cout<<"receive enc_sk from client:"<<endl;
     for (int i = 0; i < 14; ++i) {
         Ciphertext ct;
-        //每次從Client接收一個密文
-        //memset(ct,0,sizeof(ct));
-        uint32_t recv_length = net_server.one_time_receive();
-        assert(recv_length == sizeof(ct));
-        memcpy(&ct, net_server.buffer, sizeof(ct));
+        stringstream ct_stream;
+        string ct_string;
+        net_server.one_time_receive(ct_string);
+        ct_stream<<ct_string;
+        ct.load(server.newcontext_, ct_stream);
         enc_sk.push_back(ct);
+        ct_stream.clear();
+        ct_stream.str("");
+        ct_string.clear();
     }
     server.set_enc_sk(enc_sk);
+
 
     //get query from client
     PirQuery query;
@@ -209,25 +216,33 @@ int main(int argc, char* argv[]){
     for (int i = 0; i < 2; ++i) {
         GSWCiphertext query_ct;
         Ciphertext ct;
-
-        //每次從Client接收一個密文
-        //memset(ct,0,sizeof(ct));
-        uint32_t recv_length = net_server.one_time_receive();
-        assert(recv_length == sizeof(ct));
-        memcpy(&ct, net_server.buffer, sizeof(ct));
+        stringstream ct_stream;
+        string ct_string;
+        net_server.one_time_receive(ct_string);
+        ct_stream<<ct_string;
+        ct.load(server.newcontext_, ct_stream);
+        ct_stream.clear();
+        ct_stream.str("");
+        ct_string.clear();
         query_ct.push_back(ct);
         query.push_back(query_ct);
     }
-
 
     auto time_server_s = high_resolution_clock::now();
     PirReply reply = server.generate_reply_combined(query, 0); // generate reply and remote it to client
 
     //發送reply  reply只含有一個密文
-    cout<<"send pir result to client:"<<endl;
+    cout<<"server: send pir result to client:"<<endl;
     Ciphertext ct = reply[0];
-    net_server.one_time_send((char *)&ct, sizeof(ct));
-
+    stringstream ct_stream;
+    uint32_t ct_size = ct.save(ct_stream);
+    string ct_string = ct_stream.str();
+    const char * ct_temp = ct_string.c_str();
+    net_server.one_time_send(ct_temp, ct_size);
+    //清空
+    ct_string.clear();
+    ct_stream.clear();
+    ct_stream.str("");
     auto time_server_e = high_resolution_clock::now();
     auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
 
