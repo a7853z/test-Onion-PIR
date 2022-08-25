@@ -403,6 +403,7 @@ PirReply pir_server::generate_reply_combined(PirQuery query, uint32_t client_id)
 
 void pir_server::preprocess_database() {
     // 60/30
+    split_db.clear();
     int decomp_size = params_.plain_modulus().bit_count() / pir_params_.plain_base;
     for (uint32_t i = 0; i < db_->size(); i++) {
 
@@ -410,7 +411,7 @@ void pir_server::preprocess_database() {
         plain_decompositions(db_->data()[i], newcontext_, decomp_size, pir_params_.plain_base, plain_decom);
         poc_nfllib_ntt_rlwe_decomp(plain_decom);
         split_db.push_back(plain_decom);
-        
+
     }
 }
 

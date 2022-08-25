@@ -31,6 +31,8 @@ uint32_t N = 4096;
 uint32_t logt = 60;
 uint64_t size_per_item = 23;       //每条记录需要的占用23字节
 uint32_t number_of_groups = 90;
+int last_id_mod = -1;  //用来判断db是否已处理  used to determine if the db is preprocessed
+uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
 
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
@@ -134,18 +136,10 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     uint32_t id_mod; //get from client
     net_server.one_time_receive(g_string);
     memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
+    bool is_preproccessed = (last_id_mod==id_mod);
+    last_id_mod = id_mod;
     cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
     g_string.clear();
-
-    //本地讀取待查詢數據庫
-    cout<<"Server:Loading data from local files."<<endl;
-    uint32_t number_of_items = 0;
-    auto db = load_data(id_mod, size_per_item, number_of_items);
-    PirParams pir_params;
-    gen_params(number_of_items,  size_per_item, N, logt,
-                pir_params);
-    server.updata_pir_params(pir_params);
-
 
 
     //get query from client
@@ -169,9 +163,20 @@ void handle_one_query(pir_server &server, NetServer &net_server){
 
     auto time_pre_s = high_resolution_clock::now();
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
-    server.set_database(move(db), number_of_items, size_per_item);
-    //plaintext decomposition
-    server.preprocess_database();
+    if(!is_preproccessed) {
+        //本地讀取待查詢數據庫
+        auto db = load_data(id_mod, size_per_item, number_of_items);
+        PirParams pir_params;
+        gen_params(number_of_items,  size_per_item, N, logt,
+                   pir_params);
+        server.updata_pir_params(pir_params);
+        server.set_database(move(db), number_of_items, size_per_item);
+        //plaintext decomposition
+        server.preprocess_database();
+    }
+    else {
+        cout<<"Server: db is preprocessed, skip!"<<endl;
+    }
 
     auto time_pre_e = high_resolution_clock::now();
     auto time_pre_us = duration_cast<microseconds>(time_pre_e - time_pre_s).count();
@@ -210,7 +215,6 @@ int main(int argc, char* argv[]){
     NetServer net_server(ip, port);
     net_server.init_net_server();
 
-    uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
 
     //pre-process ids
     bool process_data = false;
