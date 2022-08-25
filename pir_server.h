@@ -32,6 +32,7 @@ public:
 
     void preprocess_database();
     std::shared_ptr<seal::SEALContext> newcontext_;
+    void updata_pir_params(const PirParams &pirparms);
 private:
     seal::EncryptionParameters params_; // SEAL parameters
     PirParams pir_params_;// PIR parameters

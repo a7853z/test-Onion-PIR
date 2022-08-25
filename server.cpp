@@ -26,6 +26,12 @@ using namespace std::chrono;
 using namespace seal;
 using namespace seal::util;
 
+//公共参数
+uint32_t N = 4096;
+uint32_t logt = 60;
+uint64_t size_per_item = 23;       //每条记录需要的占用23字节
+uint32_t number_of_groups = 90;
+
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
     SHA256 sha;
@@ -87,7 +93,7 @@ void process_datas(uint32_t number_of_groups){
 }
 
 unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & item_number){
-    cout << "id_mod:" << id_mod << endl;
+    cout << "Server: load data for id_mod:" << id_mod << endl;
 
     // read count of mod_id's data file
     ifstream read_count;
@@ -106,6 +112,7 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     //read data to db
     char path1[40];
     sprintf(path1, "data_map/data_map_%d.data", id_mod);
+    cout<<"Server: load data from:"<<path1<<endl;
     ifstream read_map;
     read_map.open(path1, ifstream::in);
     auto db(make_unique<uint8_t[]>(count * item_size));
@@ -120,6 +127,77 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     return db;
 }
 
+void handle_one_query(pir_server &server, NetServer &net_server){
+    // Recommended values: (logt, d) = (12, 2) or (8, 1).
+
+    string g_string;
+    uint32_t id_mod; //get from client
+    net_server.one_time_receive(g_string);
+    memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
+    cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
+    g_string.clear();
+
+    //本地讀取待查詢數據庫
+    cout<<"Server:Loading data from local files."<<endl;
+    uint32_t number_of_items = 0;
+    auto db = load_data(id_mod, size_per_item, number_of_items);
+    PirParams pir_params;
+    gen_params(number_of_items,  size_per_item, N, logt,
+                pir_params);
+    server.updata_pir_params(pir_params);
+
+
+
+    //get query from client
+    PirQuery query;
+    //實際是query維度為2*1 後面擴展為先傳維度，再根據維度接收密文
+    cout<<"Server: receive pir_query from client:"<<endl;
+    for (int i = 0; i < 2; ++i) {
+        GSWCiphertext query_ct;
+        Ciphertext ct;
+        stringstream ct_stream;
+        string ct_string;
+        net_server.one_time_receive(ct_string);
+        ct_stream<<ct_string;
+        ct.load(server.newcontext_, ct_stream);
+        ct_stream.clear();
+        ct_stream.str("");
+        ct_string.clear();
+        query_ct.push_back(ct);
+        query.push_back(query_ct);
+    }
+
+    auto time_pre_s = high_resolution_clock::now();
+    //convert db data to a vector of plaintext: covert to coefficients of polynomials first
+    server.set_database(move(db), number_of_items, size_per_item);
+    //plaintext decomposition
+    server.preprocess_database();
+
+    auto time_pre_e = high_resolution_clock::now();
+    auto time_pre_us = duration_cast<microseconds>(time_pre_e - time_pre_s).count();
+    cout << "Server: PIRServer data base pre-processing time: " << time_pre_us / 1000 << " ms" << endl;
+
+    auto time_server_s = high_resolution_clock::now();
+    PirReply reply = server.generate_reply_combined(query, 0); // generate reply and remote it to client
+
+    //發送reply  reply只含有一個密文
+    cout<<"Server: send pir result to client:"<<endl;
+    Ciphertext ct = reply[0];
+    stringstream ct_stream;
+    uint32_t ct_size = ct.save(ct_stream);
+    string ct_string = ct_stream.str();
+    const char * ct_temp = ct_string.c_str();
+    net_server.one_time_send(ct_temp, ct_size);
+    //清空
+    ct_string.clear();
+    ct_stream.clear();
+    ct_stream.str("");
+    auto time_server_e = high_resolution_clock::now();
+    auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
+
+    cout << "Server: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
+         << endl;
+}
 
 int main(int argc, char* argv[]){
     //啟動NetServer 如./server 127.0.0.1 10010
@@ -133,9 +211,6 @@ int main(int argc, char* argv[]){
     net_server.init_net_server();
 
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
-    uint64_t size_per_item = 23;       //每条记录需要的占用23字节
-    uint32_t N = 4096;
-    uint32_t number_of_groups = 90;
 
     //pre-process ids
     bool process_data = false;
@@ -143,29 +218,16 @@ int main(int argc, char* argv[]){
         process_datas(number_of_groups);
     }
 
-    // Recommended values: (logt, d) = (12, 2) or (8, 1).
-    uint32_t logt = 60;
-    string g_string;
-    uint32_t id_mod; //get from client
-    net_server.one_time_receive(g_string);
-    memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
-    cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
-
-    //本地讀取待查詢數據庫
-    cout<<"Server:Loading data from local files."<<endl;
-    auto db = load_data(id_mod, size_per_item, number_of_items);
-
+    //初始化参数，和server
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
     gen_params( number_of_items,  size_per_item, N, logt,
                 pir_params);
-
-
     //
     cout << "Server: Initializing server." << endl;
     pir_server server(parms, pir_params);
-    g_string.clear();
+    string g_string;
     net_server.one_time_receive(g_string);
     cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;
     stringstream g_stream;
@@ -179,16 +241,6 @@ int main(int argc, char* argv[]){
     g_string.clear();
     g_stream.clear();
     g_stream.str("");
-
-    auto time_pre_s = high_resolution_clock::now();
-    //convert db data to a vector of plaintext: covert to coefficients of polynomials first
-    server.set_database(move(db), number_of_items, size_per_item);
-    //plaintext decomposition
-    server.preprocess_database();
-
-    auto time_pre_e = high_resolution_clock::now();
-    auto time_pre_us = duration_cast<microseconds>(time_pre_e - time_pre_s).count();
-    cout << "Server: PIRServer data base pre-processing time: " << time_pre_us / 1000 << " ms" << endl;
 
     //get enc_sk from the client
     GSWCiphertext enc_sk;
@@ -208,45 +260,10 @@ int main(int argc, char* argv[]){
     }
     server.set_enc_sk(enc_sk);
 
-
-    //get query from client
-    PirQuery query;
-    //實際是query維度為2*1 後面擴展為先傳維度，再根據維度接收密文
-    cout<<"receive pir_query from client:"<<endl;
-    for (int i = 0; i < 2; ++i) {
-        GSWCiphertext query_ct;
-        Ciphertext ct;
-        stringstream ct_stream;
-        string ct_string;
-        net_server.one_time_receive(ct_string);
-        ct_stream<<ct_string;
-        ct.load(server.newcontext_, ct_stream);
-        ct_stream.clear();
-        ct_stream.str("");
-        ct_string.clear();
-        query_ct.push_back(ct);
-        query.push_back(query_ct);
+    while(true){
+        handle_one_query(server, net_server);
     }
 
-    auto time_server_s = high_resolution_clock::now();
-    PirReply reply = server.generate_reply_combined(query, 0); // generate reply and remote it to client
-
-    //發送reply  reply只含有一個密文
-    cout<<"server: send pir result to client:"<<endl;
-    Ciphertext ct = reply[0];
-    stringstream ct_stream;
-    uint32_t ct_size = ct.save(ct_stream);
-    string ct_string = ct_stream.str();
-    const char * ct_temp = ct_string.c_str();
-    net_server.one_time_send(ct_temp, ct_size);
-    //清空
-    ct_string.clear();
-    ct_stream.clear();
-    ct_stream.str("");
-    auto time_server_e = high_resolution_clock::now();
-    auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
-
-    cout << "Main: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
-         << endl;
+    return 0;
 }
 

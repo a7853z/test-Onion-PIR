@@ -304,6 +304,8 @@ PirQuery pir_client::generate_perm_query(std::uint64_t desiredIndex) {
     uint64_t swapbitsSize = 16;
     int logsize = ceil(log2(swapbitsSize));
     int gap = ceil(pir_params_.n / (1 << logsize));
+}
 
-
+void pir_client::updata_pir_params(const PirParams &pir_parms) {
+    pir_params_ = pir_parms;
 }

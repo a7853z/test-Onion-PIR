@@ -25,7 +25,7 @@ void pir_server::set_galois_key(std::uint32_t client_id, seal::GaloisKeys galkey
 
 }
 
-//数据转换成plaintext的d维plaintext矩阵
+//数据转换成plaintext的d维plaintext矩阵  plaintext或矩阵缺失的系数用1填充
 void
 pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uint64_t ele_num, std::uint64_t ele_size) {
     u_int64_t logt = params_.plain_modulus().bit_count();
@@ -38,7 +38,9 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
     // number of FV plaintexts needed to create the d-dimensional matrix
     uint64_t prod = 1;
     for (uint32_t i = 0; i < pir_params_.nvec.size(); i++) {
+        cout<<"nevc["<<i<<"]:"<<pir_params_.nvec[i]<<endl;
         prod *= pir_params_.nvec[i];
+        cout<<"prod:"<<prod<<endl;
     }
 
 
@@ -68,7 +70,6 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
     uint32_t offset = 0;
 
     for (uint64_t i = 0; i < total; i++) {
-
         uint64_t process_bytes = 0;
 
 
@@ -105,6 +106,7 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
         result->push_back(move(plain));
     }
 
+
     // Add padding to make database a matrix
     uint64_t current_plaintexts = result->size();
     assert(current_plaintexts <= total);
@@ -115,7 +117,7 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
          << (matrix_plaintexts - current_plaintexts) * elements_per_ptxt(logtp, N, ele_size)
          << " elements)" << endl;
 #endif
-
+    cout<<"begin padding, matrix number:"<<matrix_plaintexts<<" current number:"<< current_plaintexts<<endl;
     vector<uint64_t> padding(N, 1);
 
     for (uint64_t i = 0; i < (matrix_plaintexts - current_plaintexts); i++) {
@@ -124,8 +126,8 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
         result->push_back(plain);
     }
 
+    cout<<"set server's db"<<endl;
     set_database(move(result));
-
 }
 
 // Server takes over ownership of db and will free it when it exits
@@ -421,4 +423,8 @@ void pir_server::preprocess_database() {
 
 void pir_server::set_enc_sk(GSWCiphertext sk_enc) {
     sk_enc_=sk_enc;
+}
+
+void pir_server::updata_pir_params(const PirParams &pir_parms) {
+    pir_params_ = pir_parms;
 }

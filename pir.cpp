@@ -60,11 +60,19 @@ void gen_params(uint64_t ele_num, uint64_t ele_size, uint32_t N, uint64_t logt,
     uint64_t plaintext_num = plaintexts_per_db(logt, N, ele_num, ele_size);
 
 #ifdef DEBUG
+    cout << "plain mod " << plain_mod<< endl;
     cout << "log(plain mod) before expand = " << logt << endl;
     cout << "number of FV plaintexts = " << plaintext_num << endl;
 #endif
 
-    vector<uint64_t> nvec = get_dimensions(plaintext_num, 2);
+    vector<uint64_t> nvec;
+    if(plaintext_num!=0) {
+        nvec = get_dimensions(plaintext_num, 2);
+    }
+
+    for (int i = 0; i < nvec.size(); ++i) {
+        cout<<"nvec:"<<nvec[i]<<endl;
+    }
 
     pir_params.d = nvec.size();
     pir_params.dbc = 6;
@@ -75,7 +83,6 @@ void gen_params(uint64_t ele_num, uint64_t ele_size, uint32_t N, uint64_t logt,
     pir_params.plain_base= 30;
     pir_params.secret_base= 16;
     pir_params.gsw_decomp_size= 5;
-
 }
 
 
@@ -114,8 +121,6 @@ vector<uint64_t> get_dimensions(uint64_t &plaintext_num, uint32_t d) {
             plaintext_num=plaintext_num*dimensions[i];
         }
     }
-
-
 
     return dimensions;
 }
@@ -157,11 +162,15 @@ std::vector<std::uint64_t> bytes_to_coeffs(std::uint64_t limit, const std::uint8
     }
 
 vector<uint64_t> compute_indices(uint64_t desiredIndex, vector<uint64_t> Nvec) {
+    for (int i = 0; i < Nvec.size(); ++i) {
+        cout<<"Nvec["<<i<<"]:"<<Nvec[i]<<endl;
+    }
+
     uint32_t num = Nvec.size();
     uint64_t product = 1;
 
     for (uint32_t i = 0; i < num; i++) {
-        product *= Nvec[i];
+        product *= Nvec[i];  //256*4=1024
     }
 
     uint64_t j = desiredIndex;
@@ -174,6 +183,9 @@ vector<uint64_t> compute_indices(uint64_t desiredIndex, vector<uint64_t> Nvec) {
 
         result.push_back(ji);
         j -= ji * product;
+    }
+    for (int k = 0; k < result.size(); ++k) {
+        cout<<"result["<<k<<"]:"<<result[k]<<endl;
     }
 
     return result;

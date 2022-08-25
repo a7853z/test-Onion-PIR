@@ -37,6 +37,9 @@ public:
 
     SecretKey get_decryptor();
 
+    std::shared_ptr<seal::SEALContext> newcontext_;
+    void updata_pir_params(const PirParams &pirparms);
+
 private:
     seal::EncryptionParameters params_;
     PirParams pir_params_;
@@ -45,7 +48,6 @@ private:
     std::unique_ptr<seal::Decryptor> decryptor_;
     std::unique_ptr<seal::Evaluator> evaluator_;
     std::unique_ptr<seal::KeyGenerator> keygen_;
-    std::shared_ptr<seal::SEALContext> newcontext_;
 
 
     vector<uint64_t> indices_; // the indices for retrieval.

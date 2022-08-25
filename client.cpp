@@ -28,6 +28,12 @@ using namespace seal::util;
 
 typedef vector<Ciphertext> GSWCiphertext;
 
+//公共参数
+uint32_t N = 4096;
+uint32_t logt = 60;
+uint64_t size_per_item = 23;       //每条记录需要的占用23字节
+uint32_t number_of_groups = 90;
+
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
     SHA256 sha;
@@ -114,6 +120,98 @@ uint32_t find_index(string query_id, uint32_t number_of_groups, uint32_t &number
     return index;
 }
 
+void one_time_query(pir_client &client, NetClient &net_client, string query_id){
+    //待修改
+    //输入待查询id
+
+    uint32_t number_of_items=0;
+    // the query index to be queried, and assign value to number of items
+    uint32_t ele_index = find_index(query_id, number_of_groups, number_of_items);
+
+    while(ele_index==-1) {
+        cout<<"query_id not found, enter again:"<<endl;
+        cin>>query_id;
+        ele_index = find_index(query_id, number_of_groups, number_of_items);
+    }
+
+    //根据query_index所在group 更新pir_params
+    PirParams pir_params;
+    gen_params(number_of_items,  size_per_item, N, logt,
+               pir_params);
+    client.updata_pir_params(pir_params);
+
+
+    //获取query_id的sha256后的mod_id, 并发送给server
+    uint32_t mod_id = get_id_mod(query_id, number_of_groups);
+    cout<<"Client: sending query id's mod_id to server"<<endl;
+    net_client.one_time_send((char *)&mod_id, sizeof(mod_id));
+
+    uint64_t index = client.get_fv_index(ele_index, size_per_item);   // index of FV plaintext
+    uint64_t offset = client.get_fv_offset(ele_index, size_per_item);  //offset in a plaintext
+
+    cout << "Client: element index in the chosen Group = " << ele_index << " from [0, "
+         << number_of_items -1 << "]" << endl;
+    cout << "Client: FV index = " << index << ", FV offset = " << offset << endl;
+
+    auto time_query_s = high_resolution_clock::now();
+    PirQuery query = client.generate_query_combined(index);
+    cout<<"Client: query size = "<< query.size()<< endl;
+    for (int i = 0; i < query.size(); ++i) {
+        cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
+    }
+    cout<<"Client: sending pir query to server"<<endl;
+    //传query给server，传两个密文
+    int query_size;
+    for (int i = 0; i < 2; ++i) {
+        stringstream ct_stream;
+        Ciphertext ct = query[i][0];
+        uint32_t ct_size = ct.save(ct_stream);
+        query_size += ct_size;
+        string ct_string = ct_stream.str();
+        const char * ct_temp = ct_string.c_str();
+        net_client.one_time_send(ct_temp, ct_size);
+        //清空
+        ct_string.clear();
+        ct_stream.clear();
+        ct_stream.str("");
+    }
+    auto time_query_e = high_resolution_clock::now();
+    auto time_query_us = duration_cast<microseconds>(time_query_e - time_query_s).count();
+    cout << "Client: query generated, total bytes:" << query_size << endl;
+    cout << "Client: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
+
+    //从server获取reply
+    auto time_reply_s = high_resolution_clock::now();
+    PirReply reply;
+    Ciphertext ct;
+    stringstream ct_stream;
+    string ct_string;
+    net_client.one_time_receive(ct_string);
+    ct_stream<<ct_string;
+    ct.load(client.newcontext_, ct_stream);
+    ct_stream.clear();
+    ct_stream.str("");
+    ct_string.clear();
+    reply.push_back(ct);
+    cout<<"client: Receiving pir reply from server"<<endl;
+    auto time_reply_e = high_resolution_clock::now();
+    auto time_reply_us = duration_cast<microseconds>(time_reply_e - time_reply_s).count();
+    cout << "Client: Server reply time: " << time_reply_us / 1000 << " ms" << endl;
+
+    Plaintext rep= client.decrypt_result(reply);
+
+    // Convert from FV plaintext (polynomial) to database element at the client
+    vector<uint8_t> elems(N * logt / 8);
+    coeffs_to_bytes(logt, rep, elems.data(), (N * logt) / 8);
+
+    char pt[size_per_item];
+    for (uint32_t i = 0; i < size_per_item; ++i) {
+        pt[i] = elems[(offset * size_per_item) + i];
+    }
+    cout<<"query_id:"<<query_id<<" Retrived data:"<<pt<<endl;
+    //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
+}
+
 int main(int argc, char* argv[]){
     /*
     if (argc<3) {
@@ -132,10 +230,6 @@ int main(int argc, char* argv[]){
     net_client.init_client();
 
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
-    uint64_t size_per_item = 23;       //每条记录需要的占用23字节
-    uint32_t N = 4096;
-    uint32_t number_of_groups = 90;
-
 
     //pre-process ids
     bool process_id = false;
@@ -143,35 +237,12 @@ int main(int argc, char* argv[]){
         process_ids(number_of_groups);
     }
 
-
-    //待修改
-    //输入待查询id
-    string query_id;
-    cout<<"input a query id:"<<endl;
-    cin>> query_id;
-
-    // the query index to be queried, and assign value to number of items
-    uint32_t ele_index = find_index(query_id, number_of_groups, number_of_items);
-
-    while(ele_index==-1) {
-        cout<<"query_id not found, enter again:"<<endl;
-        cin>>query_id;
-        ele_index = find_index(query_id, number_of_groups, number_of_items);
-    }
-
-    //获取query_id的sha256后的mod_id, 并发送给server
-
-    uint32_t mod_id = get_id_mod(query_id, number_of_groups);
-    cout<<"sending mod_id to server"<<endl;
-    net_client.one_time_send((char *)&mod_id, sizeof(mod_id));
-
     // 初始化加密参数和PIR参数
-    uint32_t logt = 60;
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
     gen_params(number_of_items,  size_per_item, N, logt,
-                pir_params);
+               pir_params);
 
     // Initialize PIR client....
     pir_client client(parms, pir_params);
@@ -189,13 +260,6 @@ int main(int argc, char* argv[]){
     g_string.clear();
     galois_stream.clear();
     galois_stream.str("");
-
-    uint64_t index = client.get_fv_index(ele_index, size_per_item);   // index of FV plaintext
-    uint64_t offset = client.get_fv_offset(ele_index, size_per_item);  //offset in a plaintext
-
-    cout << "Client: element index in the chosen Group = " << ele_index << " from [0, "
-    << number_of_items -1 << "]" << endl;
-    cout << "Client: FV index = " << index << ", FV offset = " << offset << endl;
 
     //生成sk的密文，并传给server
     GSWCiphertext enc_sk=client.get_enc_sk();
@@ -215,60 +279,12 @@ int main(int argc, char* argv[]){
         ct_stream.str("");
     }
 
-    auto time_query_s = high_resolution_clock::now();
-    PirQuery query = client.generate_query_combined(index);
-    cout<<"Client: query size = "<< query.size()<< endl;
-    for (int i = 0; i < query.size(); ++i) {
-        cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
+    while(true){
+        string query_id;
+        cout<<"Client: Input a query id:"<<endl;
+        cin>> query_id;
+        one_time_query(client, net_client, query_id);
     }
-    cout<<"Client: sending pir query to server"<<endl;
-    //传query给server，传两个密文
-    for (int i = 0; i < 2; ++i) {
-        stringstream ct_stream;
-        Ciphertext ct = query[i][0];
-        uint32_t ct_size = ct.save(ct_stream);
-        string ct_string = ct_stream.str();
-        const char * ct_temp = ct_string.c_str();
-        net_client.one_time_send(ct_temp, ct_size);
-        //清空
-        ct_string.clear();
-        ct_stream.clear();
-        ct_stream.str("");
-    }
-    auto time_query_e = high_resolution_clock::now();
-    auto time_query_us = duration_cast<microseconds>(time_query_e - time_query_s).count();
-    cout << "Client: query generated" << endl;
-    cout << "Client: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
-
-
-
-    //从server获取reply
-    PirReply reply;
-    Ciphertext ct;
-    stringstream ct_stream;
-    string ct_string;
-    net_client.one_time_receive(ct_string);
-    ct_stream<<ct_string;
-    ct.load(client.newcontext_, ct_stream);
-    ct_stream.clear();
-    ct_stream.str("");
-    ct_string.clear();
-    reply.push_back(ct);
-    cout<<"client: Receiving pir reply from server"<<endl;
-
-
-    Plaintext rep= client.decrypt_result(reply);
-
-    // Convert from FV plaintext (polynomial) to database element at the client
-    vector<uint8_t> elems(N * logt / 8);
-    coeffs_to_bytes(logt, rep, elems.data(), (N * logt) / 8);
-
-    char pt[size_per_item];
-    for (uint32_t i = 0; i < size_per_item; ++i) {
-        pt[i] = elems[(offset * size_per_item) + i];
-    }
-    cout<<"query_id:"<<query_id<<" Retrived data:"<<pt<<endl;
-    //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
 
     return 0;
 }
