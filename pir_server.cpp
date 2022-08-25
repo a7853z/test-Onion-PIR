@@ -137,7 +137,6 @@ void pir_server::set_database(unique_ptr<vector<Plaintext>> &&db) {
     }
 
     db_ = move(db);
-    is_db_preprocessed_ = false;
 }
 
 
@@ -403,21 +402,15 @@ PirReply pir_server::generate_reply_combined(PirQuery query, uint32_t client_id)
 
 
 void pir_server::preprocess_database() {
-    if (!is_db_preprocessed_) {
-        // 60/30
-        int decomp_size = params_.plain_modulus().bit_count() / pir_params_.plain_base;
-        for (uint32_t i = 0; i < db_->size(); i++) {
+    // 60/30
+    int decomp_size = params_.plain_modulus().bit_count() / pir_params_.plain_base;
+    for (uint32_t i = 0; i < db_->size(); i++) {
 
-            vector<uint64_t *> plain_decom;
-            plain_decompositions(db_->data()[i], newcontext_, decomp_size, pir_params_.plain_base, plain_decom);
-            poc_nfllib_ntt_rlwe_decomp(plain_decom);
-            split_db.push_back(plain_decom);
-
-
-        }
-
-        is_db_preprocessed_ = true;
-
+        vector<uint64_t *> plain_decom;
+        plain_decompositions(db_->data()[i], newcontext_, decomp_size, pir_params_.plain_base, plain_decom);
+        poc_nfllib_ntt_rlwe_decomp(plain_decom);
+        split_db.push_back(plain_decom);
+        
     }
 }
 
