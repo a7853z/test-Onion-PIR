@@ -199,7 +199,7 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     ct_stream.str("");
     auto time_server_e = high_resolution_clock::now();
     auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
-
+    cout<<fixed<<setprecision(3)<<"Server: PIR Reply size:"<<ct_size/1024.0<<"KB"<<endl;
     cout << "Server: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
          << endl;
 }

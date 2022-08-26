@@ -161,7 +161,7 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     }
     cout<<"Client: sending pir query to server"<<endl;
     //传query给server，传两个密文
-    int query_size;
+    int query_size=0;
     for (int i = 0; i < 2; ++i) {
         stringstream ct_stream;
         Ciphertext ct = query[i][0];
@@ -177,7 +177,7 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     }
     auto time_query_e = high_resolution_clock::now();
     auto time_query_us = duration_cast<microseconds>(time_query_e - time_query_s).count();
-    cout << "Client: query generated, total bytes:" << query_size << endl;
+    cout<<fixed<<setprecision(3)<<"Client: query generated, total bytes:"<<query_size/1024.0<< endl;
     cout << "Client: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
 
     //从server获取reply
@@ -250,11 +250,14 @@ int main(int argc, char* argv[]){
     //生成Galois keys，并传给Server
     GaloisKeys galois_keys = client.generate_galois_keys();
     cout << "Client: Setting Galois keys...";
-    cout<<"Sending galois_keys to server"<<endl;
     stringstream galois_stream;
     int galois_size = galois_keys.save(galois_stream);
     string g_string = galois_stream.str();
     const char * galois_temp = g_string.c_str();
+
+    cout<<fixed<<setprecision(3)<<"Client: Sending galois_keys to server, key size:"
+    <<galois_size/1024.0<<"KB"<<endl;
+
     net_client.one_time_send(galois_temp, galois_size);
     //清空stream和string
     g_string.clear();
@@ -263,13 +266,15 @@ int main(int argc, char* argv[]){
 
     //生成sk的密文，并传给server
     GSWCiphertext enc_sk=client.get_enc_sk();
-    cout<<"Client:enc_sk size:"<<enc_sk.size()<<endl;
+
+    int enc_sk_size = 0;
     cout<<"CLient:sending enc_sk to server"<<endl;
     for (int i = 0; i < enc_sk.size(); ++i) {
         //测试数据vector总是14密文，所以直接发密文，如果有多个密文需要先发vector size
         stringstream ct_stream;
         Ciphertext ct = enc_sk[i];
         uint32_t ct_size = ct.save(ct_stream);
+        enc_sk_size += ct_size;
         string ct_string = ct_stream.str();
         const char * ct_temp = ct_string.c_str();
         net_client.one_time_send(ct_temp, ct_size);
@@ -278,6 +283,7 @@ int main(int argc, char* argv[]){
         ct_stream.clear();
         ct_stream.str("");
     }
+    cout<<fixed<<setprecision(3)<<"Client: enc_sk size:"<<enc_sk_size/1024.0<<"KB"<<endl;
 
     while(true){
         string query_id;
