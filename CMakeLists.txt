@@ -38,9 +38,8 @@ if(NFL_OPTIMIZED)
     endif()
 endif()
 
-
-add_executable(server server.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir_server.h pir_server.cpp pir.cpp pir.h NetServer.cpp NetServer.h SHA256.cpp SHA256.h)
-add_executable(client client.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir.cpp pir.h pir_client.cpp pir_client.h NetClient.cpp NetClient.h SHA256.cpp SHA256.h)
+add_executable(server server.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir_server.h pir_server.cpp pir.cpp pir.h NetServer.cpp NetServer.h SHA256.cpp SHA256.h common.h)
+add_executable(client client.cpp external_prod.h external_prod.cpp waksman.h waksman.cpp util.h  pir.cpp pir.h pir_client.cpp pir_client.h NetClient.cpp NetClient.h SHA256.cpp SHA256.h common.h)
 
 target_link_libraries(server PRIVATE SEAL::seal)
 #for mac

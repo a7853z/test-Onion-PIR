@@ -16,8 +16,8 @@
 #include "util.h"
 #include "pir.h"
 #include "pir_client.h"
-#include "SHA256.h"
 #include "NetClient.h"
+#include "common.h"
 #include <cassert>
 #include <sstream>
 
@@ -28,22 +28,6 @@ using namespace seal::util;
 
 typedef vector<Ciphertext> GSWCiphertext;
 
-//公共参数
-uint32_t N = 4096;
-uint32_t logt = 60;
-uint64_t size_per_item = 23;       //每条记录需要的占用23字节
-uint32_t number_of_groups = 90;
-
-uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
-{
-    SHA256 sha;
-    sha.update(query_id);
-    uint8_t * digest = sha.digest();
-    uint32_t id_mod = SHA256::mod(digest, number_of_groups);
-    //cout << SHA256::toString(digest) << " mod:"<<id_mod<<std::endl;
-    delete[] digest;
-    return id_mod;
-}
 
 void process_ids(uint32_t number_of_groups){
 
@@ -177,7 +161,8 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     }
     auto time_query_e = high_resolution_clock::now();
     auto time_query_us = duration_cast<microseconds>(time_query_e - time_query_s).count();
-    cout<<fixed<<setprecision(3)<<"Client: query generated, total bytes:"<<query_size/1024.0<< endl;
+    cout<<fixed<<setprecision(3)<<"Client: query generated, total bytes:"
+        <<query_size/1024.0<<"KB"<<endl;
     cout << "Client: PIRClient query generation time: " << time_query_us / 1000 << " ms" << endl;
 
     //从server获取reply

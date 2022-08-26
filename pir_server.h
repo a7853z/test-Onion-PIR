@@ -31,11 +31,11 @@ public:
     void set_enc_sk(GSWCiphertext sk_enc);
 
     void preprocess_database();
-    void write_split_db2disk();
-    void read_split_db_from_disk();
-    void clear_split_db();
     std::shared_ptr<seal::SEALContext> newcontext_;
     void updata_pir_params(const PirParams &pirparms);
+    void write_split_db2disk(char * split_db_file);
+    void read_split_db_from_disk(char * split_db_file);
+    void clear_split_db();
 private:
     seal::EncryptionParameters params_; // SEAL parameters
     PirParams pir_params_;// PIR parameters
@@ -47,8 +47,6 @@ private:
     vector<uint64_t *> plain_decom;
     vector<vector<uint64_t *>> split_db;
     GSWCiphertext sk_enc_;
-
-
 
 };
 

@@ -16,8 +16,8 @@
 #include "util.h"
 #include "pir.h"
 #include "pir_server.h"
-#include "SHA256.h"
 #include "NetServer.h"
+#include "common.h"
 #include <cassert>
 #include <sstream>
 
@@ -26,24 +26,8 @@ using namespace std::chrono;
 using namespace seal;
 using namespace seal::util;
 
-//公共参数
-uint32_t N = 4096;
-uint32_t logt = 60;
-uint64_t size_per_item = 23;       //每条记录需要的占用23字节
-uint32_t number_of_groups = 90;
 int last_id_mod = -1;  //用来判断db是否已处理  used to determine if the db is preprocessed
 uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
-
-uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
-{
-    SHA256 sha;
-    sha.update(query_id);
-    uint8_t * digest = sha.digest();
-    uint32_t id_mod = SHA256::mod(digest, number_of_groups);
-    //cout << SHA256::toString(digest) << " mod:"<<id_mod<<std::endl;
-    delete[] digest;
-    return id_mod;
-}
 
 void process_datas(uint32_t number_of_groups){
 
@@ -129,6 +113,37 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     return db;
 }
 
+void process_split_dbs(pir_server & server, uint32_t number_of_groups) {
+    for (int i = 0; i < number_of_groups; ++i) {
+        uint32_t id_mod = i;
+        auto db = load_data(id_mod, size_per_item, number_of_items);
+        PirParams pir_params;
+        gen_params(number_of_items,  size_per_item, N, logt,
+                   pir_params);
+        server.updata_pir_params(pir_params);
+        server.set_database(move(db), number_of_items, size_per_item);
+        //plaintext decomposition
+        server.preprocess_database();
+        char split_db_file[40];
+        sprintf(split_db_file, "split_db/split_db_%d.bin", id_mod);
+        server.write_split_db2disk(split_db_file);
+    }
+}
+
+void update_item_number(uint32_t id_mod, uint32_t & item_number) {
+    ifstream read_count;
+    string mod, mod_count;
+    uint32_t count;
+    read_count.open("data_map/count_data.data", ifstream::in);
+    while(read_count>>mod>>mod_count){
+        if(id_mod == atoi(mod.c_str())){
+            count = atoi(mod_count.c_str());
+            break;
+        }
+    }
+    item_number = count;
+}
+
 void handle_one_query(pir_server &server, NetServer &net_server){
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
 
@@ -165,14 +180,14 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
     if(!is_preproccessed) {
         //本地讀取待查詢數據庫
-        auto db = load_data(id_mod, size_per_item, number_of_items);
+        update_item_number(id_mod, number_of_items);
         PirParams pir_params;
         gen_params(number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
-        server.set_database(move(db), number_of_items, size_per_item);
-        //plaintext decomposition
-        server.preprocess_database();
+        char split_db_file[40];
+        sprintf(split_db_file, "split_db/split_db_%d.bin", id_mod);
+        server.read_split_db_from_disk(split_db_file);
     }
     else {
         cout<<"Server: db is preprocessed, skip!"<<endl;
@@ -222,6 +237,7 @@ int main(int argc, char* argv[]){
         process_datas(number_of_groups);
     }
 
+
     //初始化参数，和server
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
@@ -231,6 +247,13 @@ int main(int argc, char* argv[]){
     //
     cout << "Server: Initializing server." << endl;
     pir_server server(parms, pir_params);
+    bool process_split_db = false;
+    if(process_split_db) {
+        cout<<"Server: Process all split_db"<<endl;
+        process_split_dbs(server, number_of_groups);
+    }
+
+
     string g_string;
     net_server.one_time_receive(g_string);
     cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;

@@ -19,7 +19,7 @@ pir_server::pir_server(const EncryptionParameters &params, const PirParams &pir_
 
 }
 
-void pir_server::set_galois_key(std::uint32_t client_id, seal::GaloisKeys galkey) {
+void pir_server::set_galois_key(uint32_t client_id, seal::GaloisKeys galkey) {
     //galkey.parms_id() = parms_id_;
     galoisKeys_ = galkey;
 
@@ -27,7 +27,7 @@ void pir_server::set_galois_key(std::uint32_t client_id, seal::GaloisKeys galkey
 
 //数据转换成plaintext的d维plaintext矩阵  plaintext或矩阵缺失的系数用1填充
 void
-pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uint64_t ele_num, std::uint64_t ele_size) {
+pir_server::set_database(const unique_ptr<const uint8_t[]> &bytes, uint64_t ele_num, uint64_t ele_size) {
     u_int64_t logt = params_.plain_modulus().bit_count();
     uint32_t N = params_.poly_modulus_degree();
     // number of FV plaintexts needed to represent all elements
@@ -82,8 +82,8 @@ pir_server::set_database(const unique_ptr<const std::uint8_t[]> &bytes, std::uin
         }
 
         // Get the coefficients of the elements that will be packed in plaintext i
-//        bytes_to_coeffs(std::uint32_t limit, const std::uint64_t *bytes,
-//        std::uint64_t size);
+//        bytes_to_coeffs(uint32_t limit, const uint64_t *bytes,
+//        uint64_t size);
 
 
 
@@ -325,7 +325,7 @@ PirReply pir_server::generate_reply_combined(PirQuery query, uint32_t client_id)
     uint64_t durrr =  duration_cast<milliseconds>(expand_end - expand_start).count();
     cout << "Server: expand after first diemension = " << durrr << " ms" << endl;
 
-    auto remaining_start = std::chrono::high_resolution_clock::now();
+    auto remaining_start = chrono::high_resolution_clock::now();
     //for remaining dimensions we treat them differently
     uint64_t  previous_dim=0;
     for (uint32_t i = 1; i < nvec.size(); i++){
@@ -403,7 +403,8 @@ PirReply pir_server::generate_reply_combined(PirQuery query, uint32_t client_id)
 
 void pir_server::preprocess_database() {
     // 60/30
-    split_db.clear();
+    //split_db.clear();
+    clear_split_db();
     int decomp_size = params_.plain_modulus().bit_count() / pir_params_.plain_base;
     for (uint32_t i = 0; i < db_->size(); i++) {
 
@@ -411,43 +412,42 @@ void pir_server::preprocess_database() {
         plain_decompositions(db_->data()[i], newcontext_, decomp_size, pir_params_.plain_base, plain_decom);
         poc_nfllib_ntt_rlwe_decomp(plain_decom);
         split_db.push_back(plain_decom);
-
     }
 }
 
 // 将split_db写到文件中
-void pir_server::write_split_db2disk() {
-    std::ofstream os("split_db.bin", std::ios::binary | std::ios::out);
-    std::size_t size1 = split_db.size();
-    os.write(reinterpret_cast<char*>(&size1), std::streamsize(sizeof(std::size_t)));
-    for (std::size_t i = 0; i < size1; i++) {
-        std::size_t size2 = split_db[i].size();
-        os.write(reinterpret_cast<char*>(&size2), std::streamsize(sizeof(std::size_t)));
-        for (std::size_t j = 0; j < size2; j++) {
-            std::uint64_t *p = split_db[i][j];
+void pir_server::write_split_db2disk(char * split_db_file) {
+    ofstream os(split_db_file, ios::binary | ios::out);
+    size_t size1 = split_db.size();
+    os.write(reinterpret_cast<char*>(&size1), streamsize(sizeof(size_t)));
+    for (size_t i = 0; i < size1; i++) {
+        size_t size2 = split_db[i].size();
+        os.write(reinterpret_cast<char*>(&size2), streamsize(sizeof(size_t)));
+        for (size_t j = 0; j < size2; j++) {
+            uint64_t *p = split_db[i][j];
             os.write(reinterpret_cast<char*>(p),
-                     std::streamsize(sizeof(std::uint64_t)*poly_t::nmoduli*poly_t::degree));
+                     streamsize(sizeof(uint64_t)*poly_t::nmoduli*poly_t::degree));
         }
     }
     os.close();
 }
 
 // 从文件中恢复split_db
-void pir_server::read_split_db_from_disk() {
+void pir_server::read_split_db_from_disk(char * split_db_file) {
     // 读文件
-    std::ifstream is("split_db.bin", std::ios::binary | std::ios::in);
-    std::size_t size1;
-    std::vector<std::vector<std::uint64_t *>> results;
-    is.read(reinterpret_cast<char*>(&size1), std::streamsize(sizeof(std::size_t)));
-    for (std::size_t i = 0; i < size1; i++) {
-        std::size_t size2;
-        is.read(reinterpret_cast<char*>(&size2), std::streamsize(sizeof(std::size_t)));
-        std::vector<std::uint64_t *> result;
-        for (std::size_t j = 0; j < size2; j++) {
-            std::uint64_t *res = (std::uint64_t *) calloc((poly_t::nmoduli * poly_t::degree),
-                                                          sizeof(std::uint64_t));
+    ifstream is(split_db_file, ios::binary | ios::in);
+    size_t size1;
+    vector<vector<uint64_t *>> results;
+    is.read(reinterpret_cast<char*>(&size1), streamsize(sizeof(size_t)));
+    for (size_t i = 0; i < size1; i++) {
+        size_t size2;
+        is.read(reinterpret_cast<char*>(&size2), streamsize(sizeof(size_t)));
+        vector<uint64_t *> result;
+        for (size_t j = 0; j < size2; j++) {
+            uint64_t *res = (uint64_t *) calloc((poly_t::nmoduli * poly_t::degree),
+                                                          sizeof(uint64_t));
             is.read(reinterpret_cast<char*>(res),
-                    std::streamsize(poly_t::nmoduli * poly_t::degree * sizeof(std::uint64_t)));
+                    streamsize(poly_t::nmoduli * poly_t::degree * sizeof(uint64_t)));
             result.push_back(res);
         }
         results.push_back(result);
@@ -460,10 +460,10 @@ void pir_server::read_split_db_from_disk() {
 
 // 清空split_db
 void pir_server::clear_split_db() {
-    std::size_t size1 = split_db.size();
-    for (std::size_t i = 0; i < size1; i++) {
-        std::size_t size2 = split_db[i].size();
-        for (std::size_t j = 0; j < size2; j++) {
+    size_t size1 = split_db.size();
+    for (size_t i = 0; i < size1; i++) {
+        size_t size2 = split_db[i].size();
+        for (size_t j = 0; j < size2; j++) {
             free(split_db[i][j]);
         }
     }
