@@ -14,6 +14,8 @@ int NetServer::init_net_server() {
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     listen_fd = socket(AF_INET,SOCK_STREAM,0);
+    int optval = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     int ret;
     ret = bind(listen_fd,(struct sockaddr*)&server_addr,sizeof(server_addr));
     if(ret == -1) {
