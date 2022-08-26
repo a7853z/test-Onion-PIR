@@ -415,6 +415,61 @@ void pir_server::preprocess_database() {
     }
 }
 
+// 将split_db写到文件中
+void pir_server::write_split_db2disk() {
+    std::ofstream os("split_db.bin", std::ios::binary | std::ios::out);
+    std::size_t size1 = split_db.size();
+    os.write(reinterpret_cast<char*>(&size1), std::streamsize(sizeof(std::size_t)));
+    for (std::size_t i = 0; i < size1; i++) {
+        std::size_t size2 = split_db[i].size();
+        os.write(reinterpret_cast<char*>(&size2), std::streamsize(sizeof(std::size_t)));
+        for (std::size_t j = 0; j < size2; j++) {
+            std::uint64_t *p = split_db[i][j];
+            os.write(reinterpret_cast<char*>(p),
+                     std::streamsize(sizeof(std::uint64_t)*poly_t::nmoduli*poly_t::degree));
+        }
+    }
+    os.close();
+}
+
+// 从文件中恢复split_db
+void pir_server::read_split_db_from_disk() {
+    // 读文件
+    std::ifstream is("split_db.bin", std::ios::binary | std::ios::in);
+    std::size_t size1;
+    std::vector<std::vector<std::uint64_t *>> results;
+    is.read(reinterpret_cast<char*>(&size1), std::streamsize(sizeof(std::size_t)));
+    for (std::size_t i = 0; i < size1; i++) {
+        std::size_t size2;
+        is.read(reinterpret_cast<char*>(&size2), std::streamsize(sizeof(std::size_t)));
+        std::vector<std::uint64_t *> result;
+        for (std::size_t j = 0; j < size2; j++) {
+            std::uint64_t *res = (std::uint64_t *) calloc((poly_t::nmoduli * poly_t::degree),
+                                                          sizeof(std::uint64_t));
+            is.read(reinterpret_cast<char*>(res),
+                    std::streamsize(poly_t::nmoduli * poly_t::degree * sizeof(std::uint64_t)));
+            result.push_back(res);
+        }
+        results.push_back(result);
+    }
+    is.close();
+
+    clear_split_db();
+    split_db = results;
+}
+
+// 清空split_db
+void pir_server::clear_split_db() {
+    std::size_t size1 = split_db.size();
+    for (std::size_t i = 0; i < size1; i++) {
+        std::size_t size2 = split_db[i].size();
+        for (std::size_t j = 0; j < size2; j++) {
+            free(split_db[i][j]);
+        }
+    }
+    split_db.clear();
+}
+
 void pir_server::set_enc_sk(GSWCiphertext sk_enc) {
     sk_enc_=sk_enc;
 }

@@ -31,6 +31,9 @@ public:
     void set_enc_sk(GSWCiphertext sk_enc);
 
     void preprocess_database();
+    void write_split_db2disk();
+    void read_split_db_from_disk();
+    void clear_split_db();
     std::shared_ptr<seal::SEALContext> newcontext_;
     void updata_pir_params(const PirParams &pirparms);
 private:
