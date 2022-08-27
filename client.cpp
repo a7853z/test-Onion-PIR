@@ -32,7 +32,7 @@ typedef vector<Ciphertext> GSWCiphertext;
 
 void process_ids(uint32_t number_of_groups){
 
-    string id_file = "query_data.csv";
+    string id_file = ConfigFile::get_instance().get_value("data_file");
     string one_line;
     //一个数组，记录每个文件的index
     uint32_t * index = new uint32_t [number_of_groups];

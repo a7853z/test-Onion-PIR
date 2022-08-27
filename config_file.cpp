@@ -40,6 +40,12 @@ string ConfigFile::get_value(const string& key) {
     return key2value[key];
 }
 
+bool ConfigFile::get_value_bool(const string& key) {
+    string value = key2value[key];
+    if (value == "true") return true;
+    return false;
+}
+
 int ConfigFile::get_value_int(const string& key) {
     return stoi(key2value[key]);
 }

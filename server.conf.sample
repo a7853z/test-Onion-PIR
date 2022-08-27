@@ -5,3 +5,11 @@ size_per_item = 23
 number_of_groups = 90
 ip = 127.0.0.1
 port = 11111
+# 数据文件目录
+data_file = query_data.csv
+# 处理数据
+process_data = false
+# 处理split_db
+process_split_db = false
+# 批查询
+batch_id_file = query_id.csv

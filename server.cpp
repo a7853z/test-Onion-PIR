@@ -32,7 +32,7 @@ uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务�
 
 void process_datas(uint32_t number_of_groups){
 
-    string id_file = "query_data.csv";
+    string id_file = ConfigFile::get_instance().get_value("data_file");
 
     //一个数组，记录每个文件的index
     uint32_t * index = new uint32_t [number_of_groups];
@@ -244,7 +244,7 @@ int main(int argc, char* argv[]){
 
 
     //pre-process ids
-    bool process_data = false;
+    bool process_data = ConfigFile::get_instance().get_value_bool("process_data");
     if(process_data) {
         process_datas(number_of_groups);
     }
@@ -259,7 +259,7 @@ int main(int argc, char* argv[]){
     //
     cout << "Server: Initializing server." << endl;
     pir_server server(parms, pir_params);
-    bool process_split_db = false;
+    bool process_split_db = ConfigFile::get_instance().get_value_bool("process_split_db");
     if(process_split_db) {
         cout<<"Server: Process all split_db"<<endl;
         process_split_dbs(server, number_of_groups);

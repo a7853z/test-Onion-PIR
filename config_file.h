@@ -17,6 +17,7 @@ class ConfigFile {
             return config_file;
         }
         string get_value(const string& key);
+        bool get_value_bool(const string &key);
         int get_value_int(const string& key);
         uint32_t get_value_uint32(const string& key);
         uint64_t get_value_uint64(const string& key);
