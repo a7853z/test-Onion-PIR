@@ -7,7 +7,7 @@
 void NetClient::init_client() {
     cout<<"server ip:"<<server_ip<<" server port:"<<server_port<<endl;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(server_ip);
+    server_addr.sin_addr.s_addr = inet_addr(server_ip.c_str());
     server_addr.sin_port = htons(server_port);
 
     connect_fd = socket(AF_INET,SOCK_STREAM,0);

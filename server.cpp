@@ -18,6 +18,7 @@
 #include "pir_server.h"
 #include "NetServer.h"
 #include "common.h"
+#include "config_file.h"
 #include <cassert>
 #include <sstream>
 
@@ -114,6 +115,9 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
 }
 
 void process_split_dbs(pir_server & server, uint32_t number_of_groups) {
+    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
+    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
+    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t id_mod = i;
         auto db = load_data(id_mod, size_per_item, number_of_items);
@@ -177,6 +181,9 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     }
 
     auto time_pre_s = high_resolution_clock::now();
+    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
+    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
+    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
     if(!is_preproccessed) {
         //本地讀取待查詢數據庫
@@ -220,9 +227,14 @@ void handle_one_query(pir_server &server, NetServer &net_server){
 }
 
 int main(int argc, char* argv[]){
+    ConfigFile::set_path("server.conf");
+    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
+    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
+    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
+    uint32_t number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
     //啟動NetServer 如./server 127.0.0.1 10010
-    char * ip = "127.0.0.1";
-    int port = 11111;
+    string ip = ConfigFile::get_instance().get_value("ip").c_str();
+    int port = ConfigFile::get_instance().get_value_int("port");
     if (argc > 2) {
         ip = argv[1];
         port = atoi(argv[2]);

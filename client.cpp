@@ -18,6 +18,7 @@
 #include "pir_client.h"
 #include "NetClient.h"
 #include "common.h"
+#include "config_file.h"
 #include <cassert>
 #include <sstream>
 
@@ -107,6 +108,11 @@ uint32_t find_index(string query_id, uint32_t number_of_groups, uint32_t &number
 void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     //待修改
     //输入待查询id
+
+    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
+    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
+    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
+    uint32_t number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
 
     uint32_t number_of_items=0;
     // the query index to be queried, and assign value to number of items
@@ -198,6 +204,11 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
 }
 
 int main(int argc, char* argv[]){
+    ConfigFile::set_path("client.conf");
+    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
+    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
+    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
+    uint32_t number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
     /*
     if (argc<3) {
         cout<<"Error:needs assign server's ip and port"<<endl;
@@ -205,8 +216,8 @@ int main(int argc, char* argv[]){
     */
 
     //啟動net_client 如 ./client 127.0.0.1 10010
-    char *ip="127.0.0.1";
-    int port=11111;
+    string ip = ConfigFile::get_instance().get_value("ip");
+    int port = ConfigFile::get_instance().get_value_int("port");
     if (argc > 2) {
         ip = argv[1];
         port = atoi(argv[2]);

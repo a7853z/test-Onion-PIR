@@ -32,7 +32,7 @@ class NetServer {
 public:
     int listen_fd = -1, connect_fd = -1;
     uint32_t server_port;
-    const char* server_ip;
+    string server_ip;
     sockaddr_in server_addr;
     sockaddr_in client_addr;
     uint32_t sin_size, data_len;
@@ -41,7 +41,7 @@ public:
     int one_time_receive(string &message);
     bool one_time_send(const char * buf, uint32_t size);
     bool send_ready = true;
-    NetServer(char* ip ="127.0.0.1" , int port = 11111) {
+    NetServer(string ip ="127.0.0.1" , int port = 11111) {
         server_ip = ip;
         server_port = port;
     }

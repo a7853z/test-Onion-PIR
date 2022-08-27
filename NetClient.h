@@ -32,12 +32,12 @@ public:
     char buffer[BUFFER_SIZE];
     struct sockaddr_in server_addr;    // 服务器地址结构
     uint32_t server_port;
-    char* server_ip;
+    string server_ip;
     void init_client();
     int one_time_receive(string &message);
     bool one_time_send(const char * buf, uint32_t size);
     bool send_ready = true;
-    NetClient(char* ip ="127.0.0.1" , int port = 11111) {
+    NetClient(string ip ="127.0.0.1" , int port = 11111) {
         server_ip = ip;
         server_port = port;
     }

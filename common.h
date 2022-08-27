@@ -9,11 +9,6 @@
 
 #include "SHA256.h"
 
-uint32_t N = 4096;
-uint32_t logt = 60;
-uint64_t size_per_item = 23;       //每条记录需要的占用23字节
-uint32_t number_of_groups = 90;
-
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
     SHA256 sha;

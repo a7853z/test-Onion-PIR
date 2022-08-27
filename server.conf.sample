@@ -1,0 +1,7 @@
+N = 4096
+logt = 60
+# 每条记录需要的占用23字节
+size_per_item = 23
+number_of_groups = 90
+ip = 127.0.0.1
+port = 11111
