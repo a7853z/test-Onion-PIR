@@ -225,13 +225,15 @@ void handle_one_query(pir_server &server, NetServer &net_server){
 
 int main(int argc, char* argv[]){
     ConfigFile::set_path("server.conf");
-    N = ConfigFile::get_instance().get_value_uint32("N");
-    logt = ConfigFile::get_instance().get_value_uint32("logt");
-    size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
-    number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
-    //啟動NetServer 如./server 127.0.0.1 10010
-    string ip = ConfigFile::get_instance().get_value("ip").c_str();
-    int port = ConfigFile::get_instance().get_value_int("port");
+    ConfigFile config = ConfigFile::get_instance();
+    if(config.key_exist("N")) N = config.get_value_uint32("N");
+    if(config.key_exist("logt")) logt = config.get_value_uint32("logt");
+    if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
+    if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
+
+    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
+    if(config.key_exist("ip")) ip = config.get_value("ip");
+    if(config.key_exist("port")) port = config.get_value_int("port");
 
     NetServer net_server(ip, port);
     net_server.init_net_server();
