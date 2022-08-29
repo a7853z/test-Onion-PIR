@@ -8,6 +8,11 @@
 #endif //ONIONPIR_COMMON_H
 
 #include "SHA256.h"
+ls
+uint32_t N=4096;
+uint32_t logt=60;
+uint64_t size_per_item=23;
+uint32_t number_of_groups=90;
 
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {

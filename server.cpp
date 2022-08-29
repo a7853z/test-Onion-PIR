@@ -181,9 +181,6 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     }
 
     auto time_pre_s = high_resolution_clock::now();
-    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
-    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
-    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
     if(!is_preproccessed) {
         //本地讀取待查詢數據庫
@@ -228,17 +225,14 @@ void handle_one_query(pir_server &server, NetServer &net_server){
 
 int main(int argc, char* argv[]){
     ConfigFile::set_path("server.conf");
-    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
-    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
-    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
-    uint32_t number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
+    N = ConfigFile::get_instance().get_value_uint32("N");
+    logt = ConfigFile::get_instance().get_value_uint32("logt");
+    size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
+    number_of_groups = ConfigFile::get_instance().get_value_uint32("number_of_groups");
     //啟動NetServer 如./server 127.0.0.1 10010
     string ip = ConfigFile::get_instance().get_value("ip").c_str();
     int port = ConfigFile::get_instance().get_value_int("port");
-    if (argc > 2) {
-        ip = argv[1];
-        port = atoi(argv[2]);
-    }
+
     NetServer net_server(ip, port);
     net_server.init_net_server();
 
