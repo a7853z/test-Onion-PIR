@@ -240,7 +240,7 @@ int main(int argc, char* argv[]){
 
 
     //pre-process ids
-    bool process_data = ConfigFile::get_instance().get_value_bool("process_data");
+    if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
     if(process_data) {
         process_datas(number_of_groups);
     }
@@ -255,7 +255,7 @@ int main(int argc, char* argv[]){
     //
     cout << "Server: Initializing server." << endl;
     pir_server server(parms, pir_params);
-    bool process_split_db = ConfigFile::get_instance().get_value_bool("process_split_db");
+    if(config.key_exist("process_split_db")) = config.get_value_bool("process_split_db");
     if(process_split_db) {
         cout<<"Server: Process all split_db"<<endl;
         process_split_dbs(server, number_of_groups);

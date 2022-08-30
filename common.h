@@ -15,6 +15,8 @@ uint64_t size_per_item=23;
 uint32_t number_of_groups=90;
 string ip = "127.0.0.1";
 int port = 11111;
+bool process_data=false;
+bool process_split_db=false;
 
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
