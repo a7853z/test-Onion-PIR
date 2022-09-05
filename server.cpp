@@ -290,19 +290,18 @@ int main(int argc, char* argv[]){
         process_datas(number_of_groups);
     }
 
-    //初始化参数，和server
-    PirParams pir_params;
-    EncryptionParameters parms(scheme_type::BFV);
-    set_bfv_parms(parms);   //N和logt在这里设置
-    gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
-    //
-    cout << "Server: Initializing server." << endl;
-    pir_server server(parms, pir_params);
     if(process_split_db) { // 为true时不要多线程
+        //初始化参数，和server
+        PirParams pir_params;
+        EncryptionParameters parms(scheme_type::BFV);
+        set_bfv_parms(parms);   //N和logt在这里设置
+        gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
+        //
+        cout << "Server: Initializing server." << endl;
+        pir_server server(parms, pir_params);
         cout<<"Server:: Process all split_db"<<endl;
         process_split_dbs(server, number_of_groups);
     }
-    delete &server;
 
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
     if(config.key_exist("ip")) ip = config.get_value("ip");
