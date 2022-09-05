@@ -34,7 +34,8 @@ public:
     std::shared_ptr<seal::SEALContext> newcontext_;
     void updata_pir_params(const PirParams &pirparms);
     void write_split_db2disk(char * split_db_file);
-    void read_split_db_from_disk(char * split_db_file);
+    void read_split_db_from_disk(uint32_t id_mod);
+    void read_split_db_from_cache(uint32_t id_mod);
     void clear_split_db();
 private:
     seal::EncryptionParameters params_; // SEAL parameters

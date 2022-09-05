@@ -4,6 +4,7 @@
 //
 
 #include "pir_server.h"
+#include "db_center.h"
 
 
 pir_server::pir_server(const EncryptionParameters &params, const PirParams &pir_params) :
@@ -432,30 +433,13 @@ void pir_server::write_split_db2disk(char * split_db_file) {
     os.close();
 }
 
-// 从文件中恢复split_db
-void pir_server::read_split_db_from_disk(char * split_db_file) {
-    // 读文件
-    ifstream is(split_db_file, ios::binary | ios::in);
-    size_t size1;
-    vector<vector<uint64_t *>> results;
-    is.read(reinterpret_cast<char*>(&size1), streamsize(sizeof(size_t)));
-    for (size_t i = 0; i < size1; i++) {
-        size_t size2;
-        is.read(reinterpret_cast<char*>(&size2), streamsize(sizeof(size_t)));
-        vector<uint64_t *> result;
-        for (size_t j = 0; j < size2; j++) {
-            uint64_t *res = (uint64_t *) calloc((poly_t::nmoduli * poly_t::degree),
-                                                          sizeof(uint64_t));
-            is.read(reinterpret_cast<char*>(res),
-                    streamsize(poly_t::nmoduli * poly_t::degree * sizeof(uint64_t)));
-            result.push_back(res);
-        }
-        results.push_back(result);
-    }
-    is.close();
-
+void pir_server::read_split_db_from_disk(uint32_t id_mod) {
     clear_split_db();
-    split_db = results;
+    split_db = DbCenter::read_split_db_from_disk(id_mod);
+}
+
+void pir_server::read_split_db_from_cache(uint32_t id_mod) {
+    split_db = DbCenter::get_instance().get_db(id_mod);
 }
 
 // 清空split_db

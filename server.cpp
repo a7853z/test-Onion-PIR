@@ -187,9 +187,7 @@ bool handle_one_query(ConnData* conn_data, pir_server &server){
         gen_params(conn_data->number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
-        char split_db_file[40];
-        sprintf(split_db_file, "split_db/split_db_%d.bin", id_mod);
-        server.read_split_db_from_disk(split_db_file);
+        server.read_split_db_from_cache(id_mod);
     }
     else {
         cout<<"Server:: db is preprocessed, skip!"<<endl;
