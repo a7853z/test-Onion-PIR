@@ -27,9 +27,6 @@ using namespace std::chrono;
 using namespace seal;
 using namespace seal::util;
 
-int last_id_mod = -1;  //用来判断db是否已处理  used to determine if the db is preprocessed
-uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
-
 void process_datas(uint32_t number_of_groups){
 
     string id_file = ConfigFile::get_instance().get_value("data_file");
@@ -114,18 +111,18 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     return db;
 }
 
-void process_split_dbs(pir_server & server, uint32_t number_of_groups) {
+void process_split_dbs(ConnData* conn_data, pir_server & server, uint32_t number_of_groups) {
     uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
     uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
     uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t id_mod = i;
-        auto db = load_data(id_mod, size_per_item, number_of_items);
+        auto db = load_data(id_mod, size_per_item, conn_data->number_of_items);
         PirParams pir_params;
-        gen_params(number_of_items,  size_per_item, N, logt,
+        gen_params(conn_data->number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
-        server.set_database(move(db), number_of_items, size_per_item);
+        server.set_database(move(db), conn_data->number_of_items, size_per_item);
         //plaintext decomposition
         server.preprocess_database();
         char split_db_file[40];
@@ -148,15 +145,15 @@ void update_item_number(uint32_t id_mod, uint32_t & item_number) {
     item_number = count;
 }
 
-void handle_one_query(pir_server &server, NetServer &net_server){
+void handle_one_query(ConnData* conn_data, pir_server &server){
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
 
     string g_string;
     uint32_t id_mod; //get from client
-    net_server.one_time_receive(g_string);
+    NetServer::one_time_receive(conn_data, g_string);
     memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
-    bool is_preproccessed = (last_id_mod==id_mod);
-    last_id_mod = id_mod;
+    bool is_preproccessed = (conn_data->last_id_mod==id_mod);
+    conn_data->last_id_mod = id_mod;
     cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
     g_string.clear();
 
@@ -170,7 +167,7 @@ void handle_one_query(pir_server &server, NetServer &net_server){
         Ciphertext ct;
         stringstream ct_stream;
         string ct_string;
-        net_server.one_time_receive(ct_string);
+        NetServer::one_time_receive(conn_data, ct_string);
         ct_stream<<ct_string;
         ct.load(server.newcontext_, ct_stream);
         ct_stream.clear();
@@ -184,9 +181,9 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     //convert db data to a vector of plaintext: covert to coefficients of polynomials first
     if(!is_preproccessed) {
         //本地讀取待查詢數據庫
-        update_item_number(id_mod, number_of_items);
+        update_item_number(id_mod, conn_data->number_of_items);
         PirParams pir_params;
-        gen_params(number_of_items,  size_per_item, N, logt,
+        gen_params(conn_data->number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
         char split_db_file[40];
@@ -211,7 +208,7 @@ void handle_one_query(pir_server &server, NetServer &net_server){
     uint32_t ct_size = ct.save(ct_stream);
     string ct_string = ct_stream.str();
     const char * ct_temp = ct_string.c_str();
-    net_server.one_time_send(ct_temp, ct_size);
+    NetServer::one_time_send(conn_data, ct_temp, ct_size);
     //清空
     ct_string.clear();
     ct_stream.clear();
@@ -223,47 +220,26 @@ void handle_one_query(pir_server &server, NetServer &net_server){
          << endl;
 }
 
-int main(int argc, char* argv[]){
-    ConfigFile::set_path("server.conf");
-    ConfigFile config = ConfigFile::get_instance();
-    if(config.key_exist("N")) N = config.get_value_uint32("N");
-    if(config.key_exist("logt")) logt = config.get_value_uint32("logt");
-    if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
-    if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
-
-    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
-    if(config.key_exist("ip")) ip = config.get_value("ip");
-    if(config.key_exist("port")) port = config.get_value_int("port");
-
-    NetServer net_server(ip, port);
-    net_server.init_net_server();
-
-
-    //pre-process ids
-    if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
-    if(process_data) {
-        process_datas(number_of_groups);
-    }
-
+// 创建一个线程，用来处理这个连接
+void handle_connection(int connect_fd) {
+    ConnData* conn_data = new ConnData();
+    conn_data->connect_fd = connect_fd;
 
     //初始化参数，和server
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
-    gen_params( number_of_items,  size_per_item, N, logt,
-                pir_params);
+    gen_params(conn_data->number_of_items,  size_per_item, N, logt, pir_params);
     //
     cout << "Server: Initializing server." << endl;
     pir_server server(parms, pir_params);
-    if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
-    if(process_split_db) {
+    if(process_split_db) { // 为true时不要多线程
         cout<<"Server: Process all split_db"<<endl;
-        process_split_dbs(server, number_of_groups);
+        process_split_dbs(conn_data, server, number_of_groups);
     }
 
-
     string g_string;
-    net_server.one_time_receive(g_string);
+    NetServer::one_time_receive(conn_data, g_string);
     cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;
     stringstream g_stream;
     g_stream<<g_string;
@@ -285,7 +261,7 @@ int main(int argc, char* argv[]){
         Ciphertext ct;
         stringstream ct_stream;
         string ct_string;
-        net_server.one_time_receive(ct_string);
+        NetServer::one_time_receive(conn_data, ct_string);
         ct_stream<<ct_string;
         ct.load(server.newcontext_, ct_stream);
         enc_sk.push_back(ct);
@@ -296,7 +272,35 @@ int main(int argc, char* argv[]){
     server.set_enc_sk(enc_sk);
 
     while(true){
-        handle_one_query(server, net_server);
+        handle_one_query(conn_data, server);
+    }
+}
+
+int main(int argc, char* argv[]){
+    ConfigFile::set_path("server.conf");
+    ConfigFile config = ConfigFile::get_instance();
+    if(config.key_exist("N")) N = config.get_value_uint32("N");
+    if(config.key_exist("logt")) logt = config.get_value_uint32("logt");
+    if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
+    if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
+    if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
+
+    //pre-process ids
+    if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
+    if(process_data) {
+        process_datas(number_of_groups);
+    }
+
+    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
+    if(config.key_exist("ip")) ip = config.get_value("ip");
+    if(config.key_exist("port")) port = config.get_value_int("port");
+
+    NetServer net_server(ip, port);
+    net_server.init_net_server();
+    while (true) {
+        int connect_fd = net_server.wait_connection();
+        thread t(handle_connection, connect_fd);
+        t.detach();
     }
 
     return 0;
