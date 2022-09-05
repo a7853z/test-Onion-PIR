@@ -64,6 +64,10 @@ int NetServer::one_time_receive(ConnData* conn_data, string &message){
     uint32_t recv_bytes;
     uint32_t size;
     recv_bytes = recv(conn_data->connect_fd, conn_data->buffer, sizeof(conn_data->buffer), 0);
+    if (recv_bytes == 0) {
+        cout<<"receive 0 bytes!"<<endl;
+        return -1;
+    }
     memcpy(&size, conn_data->buffer, sizeof(size));
     cout<<"net_server: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
 
