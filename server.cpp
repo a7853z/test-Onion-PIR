@@ -143,12 +143,14 @@ void update_item_number(uint32_t id_mod, uint32_t & item_number) {
     item_number = count;
 }
 
-void handle_one_query(ConnData* conn_data, pir_server &server){
+bool handle_one_query(ConnData* conn_data, pir_server &server){
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
 
     string g_string;
     uint32_t id_mod; //get from client
-    NetServer::one_time_receive(conn_data, g_string);
+    int ret;
+    ret = NetServer::one_time_receive(conn_data, g_string);
+    if (ret == -1) return false;
     memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
     bool is_preproccessed = (conn_data->last_id_mod==id_mod);
     conn_data->last_id_mod = id_mod;
@@ -165,7 +167,8 @@ void handle_one_query(ConnData* conn_data, pir_server &server){
         Ciphertext ct;
         stringstream ct_stream;
         string ct_string;
-        NetServer::one_time_receive(conn_data, ct_string);
+        ret = NetServer::one_time_receive(conn_data, ct_string);
+        if (ret == -1) return false;
         ct_stream<<ct_string;
         ct.load(server.newcontext_, ct_stream);
         ct_stream.clear();
@@ -216,6 +219,8 @@ void handle_one_query(ConnData* conn_data, pir_server &server){
     cout<<fixed<<setprecision(3)<<"Server: PIR Reply size:"<<ct_size/1024.0<<"KB"<<endl;
     cout << "Server: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
          << endl;
+    
+    return true;
 }
 
 // 创建一个线程，用来处理这个连接
@@ -232,7 +237,9 @@ void handle_connection(int connect_fd) {
     pir_server server(parms, pir_params);
 
     string g_string;
-    NetServer::one_time_receive(conn_data, g_string);
+    int ret;
+    ret = NetServer::one_time_receive(conn_data, g_string);
+    if (ret == -1) return;
     cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;
     stringstream g_stream;
     g_stream<<g_string;
@@ -264,8 +271,7 @@ void handle_connection(int connect_fd) {
     }
     server.set_enc_sk(enc_sk);
 
-    while(true){
-        handle_one_query(conn_data, server);
+    while(handle_one_query(conn_data, server)) {
     }
 }
 
