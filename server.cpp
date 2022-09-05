@@ -112,9 +112,6 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
 }
 
 void process_split_dbs(ConnData* conn_data, pir_server & server, uint32_t number_of_groups) {
-    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
-    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
-    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t id_mod = i;
         auto db = load_data(id_mod, size_per_item, conn_data->number_of_items);
