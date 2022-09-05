@@ -13,3 +13,5 @@ process_data = false
 process_split_db = false
 # 批查询
 batch_id_file = query_id.csv
+# split_db是否缓存
+use_memory_db = false

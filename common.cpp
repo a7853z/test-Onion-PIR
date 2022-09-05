@@ -8,3 +8,4 @@ string ip = "127.0.0.1";
 int port = 11111;
 bool process_data=false;
 bool process_split_db=false;
+bool use_memory_db=false;

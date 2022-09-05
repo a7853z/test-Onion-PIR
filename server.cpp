@@ -187,7 +187,11 @@ bool handle_one_query(ConnData* conn_data, pir_server &server){
         gen_params(conn_data->number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
-        server.read_split_db_from_cache(id_mod);
+        if (use_memory_db) {
+            server.read_split_db_from_cache(id_mod);
+        } else {
+            server.read_split_db_from_disk(id_mod);
+        }
     }
     else {
         cout<<"Server:: db is preprocessed, skip!"<<endl;
@@ -281,6 +285,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
     if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
+    if(config.key_exist("use_memory_db")) use_memory_db = config.get_value_bool("use_memory_db");
 
     //pre-process ids
     if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
