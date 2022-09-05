@@ -126,7 +126,7 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
 
     //获取query_id的sha256后的mod_id, 并发送给server
     uint32_t mod_id = get_id_mod(query_id, number_of_groups);
-    cout<<"Client: sending query id's mod_id to server"<<endl;
+    cout<<"Client:: sending query id's mod_id to server"<<endl;
     net_client.one_time_send((char *)&mod_id, sizeof(mod_id));
 
     uint64_t index = client.get_fv_index(ele_index, size_per_item);   // index of FV plaintext
@@ -138,11 +138,11 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
 
     auto time_query_s = high_resolution_clock::now();
     PirQuery query = client.generate_query_combined(index);
-    cout<<"Client: query size = "<< query.size()<< endl;
+    cout<<"Client:: query size = "<< query.size()<< endl;
     for (int i = 0; i < query.size(); ++i) {
         cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
     }
-    cout<<"Client: sending pir query to server"<<endl;
+    cout<<"Client:: sending pir query to server"<<endl;
     //传query给server，传两个密文
     int query_size=0;
     for (int i = 0; i < 2; ++i) {
@@ -177,7 +177,7 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     ct_stream.str("");
     ct_string.clear();
     reply.push_back(ct);
-    cout<<"client: Receiving pir reply from server"<<endl;
+    cout<<"Client:: Receiving pir reply from server"<<endl;
     auto time_reply_e = high_resolution_clock::now();
     auto time_reply_us = duration_cast<microseconds>(time_reply_e - time_reply_s).count();
     cout << "Client: Server reply time: " << time_reply_us / 1000 << " ms" << endl;
@@ -255,7 +255,7 @@ int main(int argc, char* argv[]){
     GSWCiphertext enc_sk=client.get_enc_sk();
 
     int enc_sk_size = 0;
-    cout<<"CLient:sending enc_sk to server"<<endl;
+    cout<<"Client::sending enc_sk to server"<<endl;
     for (int i = 0; i < enc_sk.size(); ++i) {
         //测试数据vector总是14密文，所以直接发密文，如果有多个密文需要先发vector size
         stringstream ct_stream;
@@ -274,11 +274,10 @@ int main(int argc, char* argv[]){
 
     while(true){
         string query_id;
-        cout<<"Client: Input a query id:"<<endl;
+        cout<<"Client:: Input a query id:"<<endl;
         cin>> query_id;
         one_time_query(client, net_client, query_id);
     }
-
     return 0;
 }
 

@@ -36,7 +36,7 @@ int NetClient::one_time_receive(string &message){
     uint32_t size;
     recv_bytes = recv(connect_fd, buffer, sizeof(buffer), 0);
     memcpy(&size, buffer, sizeof(size));
-    cout<<"net_client: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
+    cout<<"net_client:: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
 
     size-=(recv_bytes-sizeof(size));
 
@@ -60,7 +60,7 @@ int NetClient::one_time_receive(string &message){
         size-=recv_bytes;
     }
 
-    cout<<"net_client: received message length:"<<message.length()<<endl;
+    cout<<"net_client:: received message length:"<<message.length()<<endl;
     //send 'finished'
     cout<<"received, sending finished message"<<endl;
     char *msg = "finished";
@@ -72,15 +72,15 @@ bool NetClient::one_time_send(const char * buf, uint32_t size){
     //连续发送  直到发送完
     //cout<<"send ready:"<<send_ready<<endl;
     if(!send_ready) {
-        cout<<"net_client: not ready to send, wait till finish"<<endl;
+        cout<<"net_client:: not ready to send, wait till finish"<<endl;
         uint32_t recv_bytes = recv(connect_fd, (char*)&buffer, 8, 0);  //"finished" length 8
         //buffer[recv_bytes] = '\0';
         if(strcmp(buffer, "finished")==0) {
-            cout<<"net_client: finished sending a message"<<endl;
+            cout<<"net_client:: finished sending a message"<<endl;
             send_ready = true;
         }
         else {
-            cout<<"net_client: didn't receive the finish message, received buffer:"<<buffer<<endl;
+            cout<<"net_client:: didn't receive the finish message, received buffer:"<<buffer<<endl;
         }
     }
     while(!send_ready) {
@@ -88,7 +88,7 @@ bool NetClient::one_time_send(const char * buf, uint32_t size){
 
     //send length first
     uint32_t length = size;
-    cout<<"net_client: sending message length:"<<length<<endl;
+    cout<<"net_client:: sending message length:"<<length<<endl;
     send(connect_fd, (char *)&length, sizeof(length), 0);
 
     uint32_t sended = 0;
@@ -96,9 +96,9 @@ bool NetClient::one_time_send(const char * buf, uint32_t size){
     {
         int SendSize= send(connect_fd, buf+sended, size, 0);
         sended +=SendSize;
-        cout<<"net_client: Sended size:"<<SendSize<<endl;
+        //cout<<"net_client:: Sended size:"<<SendSize<<endl;
         if(SendSize<0) {
-            cout<<"net_client: send error"<<SendSize<<endl;
+            cout<<"net_client:: send error"<<SendSize<<endl;
             return false;
         }
         size = size - SendSize;//用于循环发送且退出功能
@@ -107,21 +107,21 @@ bool NetClient::one_time_send(const char * buf, uint32_t size){
 
     send_ready = false;
 
-    cout<<"net_client: waiting for finish reply from net_server."<<endl;
+    cout<<"net_client:: waiting for finish reply from net_server."<<endl;
     memset(&buffer, 0, sizeof(buffer));
     if(connect_fd < 0) {
-        cout<<"net_client: wrong connect_fd:"<<connect_fd<<endl;
+        cout<<"net_client:: wrong connect_fd:"<<connect_fd<<endl;
         return -1;
     }
     uint32_t recv_bytes = recv(connect_fd, (char*)&buffer, 8, 0);  //"finished" length 8
     //buffer[recv_bytes] = '\0';
 
     if(strcmp(buffer, "finished")==0) {
-        cout<<"net_client: finished sending a message"<<endl;
+        cout<<"net_client:: finished sending a message"<<endl;
         send_ready = true;
     }
     else {
-        cout<<"net_client: didn't receive the finish message, received buffer:"<<buffer<<endl;
+        cout<<"net_client:: didn't receive the finish message, received buffer:"<<buffer<<endl;
     }
     return true;
 }

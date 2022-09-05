@@ -96,7 +96,7 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     //read data to db
     char path1[40];
     sprintf(path1, "data_map/data_map_%d.data", id_mod);
-    cout<<"Server: load data from:"<<path1<<endl;
+    cout<<"Server:: load data from:"<<path1<<endl;
     ifstream read_map;
     read_map.open(path1, ifstream::in);
     auto db(make_unique<uint8_t[]>(count * item_size));
@@ -111,18 +111,16 @@ unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & 
     return db;
 }
 
-void process_split_dbs(ConnData* conn_data, pir_server & server, uint32_t number_of_groups) {
-    uint32_t N = ConfigFile::get_instance().get_value_uint32("N");
-    uint32_t logt = ConfigFile::get_instance().get_value_uint32("logt");
-    uint64_t size_per_item = ConfigFile::get_instance().get_value_uint64("size_per_item");
+void process_split_dbs(pir_server & server, uint32_t number_of_groups) {
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t id_mod = i;
-        auto db = load_data(id_mod, size_per_item, conn_data->number_of_items);
+        uint32_t number_of_items = 0;
+        auto db = load_data(id_mod, size_per_item, number_of_items);
         PirParams pir_params;
-        gen_params(conn_data->number_of_items,  size_per_item, N, logt,
+        gen_params(number_of_items,  size_per_item, N, logt,
                    pir_params);
         server.updata_pir_params(pir_params);
-        server.set_database(move(db), conn_data->number_of_items, size_per_item);
+        server.set_database(move(db), number_of_items, size_per_item);
         //plaintext decomposition
         server.preprocess_database();
         char split_db_file[40];
@@ -154,14 +152,14 @@ void handle_one_query(ConnData* conn_data, pir_server &server){
     memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
     bool is_preproccessed = (conn_data->last_id_mod==id_mod);
     conn_data->last_id_mod = id_mod;
-    cout<<"Server:getting id_mod from client:"<<id_mod<<endl;
+    cout<<"Server::getting id_mod from client:"<<id_mod<<endl;
     g_string.clear();
 
 
     //get query from client
     PirQuery query;
     //實際是query維度為2*1 後面擴展為先傳維度，再根據維度接收密文
-    cout<<"Server: receive pir_query from client:"<<endl;
+    cout<<"Server:: receive pir_query from client:"<<endl;
     for (int i = 0; i < 2; ++i) {
         GSWCiphertext query_ct;
         Ciphertext ct;
@@ -191,7 +189,7 @@ void handle_one_query(ConnData* conn_data, pir_server &server){
         server.read_split_db_from_disk(split_db_file);
     }
     else {
-        cout<<"Server: db is preprocessed, skip!"<<endl;
+        cout<<"Server:: db is preprocessed, skip!"<<endl;
     }
 
     auto time_pre_e = high_resolution_clock::now();
@@ -202,7 +200,7 @@ void handle_one_query(ConnData* conn_data, pir_server &server){
     PirReply reply = server.generate_reply_combined(query, 0); // generate reply and remote it to client
 
     //發送reply  reply只含有一個密文
-    cout<<"Server: send pir result to client:"<<endl;
+    cout<<"Server:: send pir result to client:"<<endl;
     Ciphertext ct = reply[0];
     stringstream ct_stream;
     uint32_t ct_size = ct.save(ct_stream);
@@ -225,18 +223,13 @@ void handle_connection(int connect_fd) {
     ConnData* conn_data = new ConnData();
     conn_data->connect_fd = connect_fd;
 
-    //初始化参数，和server
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
-    gen_params(conn_data->number_of_items,  size_per_item, N, logt, pir_params);
+    gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
     //
-    cout << "Server: Initializing server." << endl;
+    cout << "Server: Initializing server for a Client, Client connect_fd:"<<connect_fd << endl;
     pir_server server(parms, pir_params);
-    if(process_split_db) { // 为true时不要多线程
-        cout<<"Server: Process all split_db"<<endl;
-        process_split_dbs(conn_data, server, number_of_groups);
-    }
 
     string g_string;
     NetServer::one_time_receive(conn_data, g_string);
@@ -290,6 +283,20 @@ int main(int argc, char* argv[]){
     if(process_data) {
         process_datas(number_of_groups);
     }
+
+    //初始化参数，和server
+    PirParams pir_params;
+    EncryptionParameters parms(scheme_type::BFV);
+    set_bfv_parms(parms);   //N和logt在这里设置
+    gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
+    //
+    cout << "Server: Initializing server." << endl;
+    pir_server server(parms, pir_params);
+    if(process_split_db) { // 为true时不要多线程
+        cout<<"Server:: Process all split_db"<<endl;
+        process_split_dbs(server, number_of_groups);
+    }
+    delete &server;
 
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
     if(config.key_exist("ip")) ip = config.get_value("ip");
