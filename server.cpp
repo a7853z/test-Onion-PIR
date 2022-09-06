@@ -286,6 +286,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
     if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
     if(config.key_exist("use_memory_db")) use_memory_db = config.get_value_bool("use_memory_db");
+    if(config.key_exist("max_memory_db_size")) max_memory_db_size = config.get_value_float("max_memory_db_size");
 
     //pre-process ids
     if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");

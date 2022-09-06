@@ -9,3 +9,4 @@ int port = 11111;
 bool process_data=false;
 bool process_split_db=false;
 bool use_memory_db=false;
+float max_memory_db_size=12.0; // 单位为GB

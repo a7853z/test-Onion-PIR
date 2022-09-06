@@ -19,6 +19,7 @@ extern int port;
 extern bool process_data;
 extern bool process_split_db;
 extern bool use_memory_db;
+extern float max_memory_db_size;
 
 inline uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {

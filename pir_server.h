@@ -17,7 +17,7 @@ typedef std::vector<seal::Ciphertext> PirReply;
 
 
 
-class pir_server { // TODO 是否需要处理多线程问题
+class pir_server {
 public:
     pir_server(const seal::EncryptionParameters &params, const PirParams &pir_params);
     void set_galois_key(std::uint32_t client_id, seal::GaloisKeys galkey);

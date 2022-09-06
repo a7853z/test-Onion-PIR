@@ -15,3 +15,5 @@ process_split_db = false
 batch_id_file = query_id.csv
 # split_db是否缓存
 use_memory_db = false
+# 限制split_db占用的最大内存（单位为GB），需要开启use_memory_db
+max_memory_db_size = 12.0
