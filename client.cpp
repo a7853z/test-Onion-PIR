@@ -21,6 +21,7 @@
 #include "config_file.h"
 #include <cassert>
 #include <sstream>
+#include <pthread.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -31,7 +32,6 @@ typedef vector<Ciphertext> GSWCiphertext;
 
 void process_ids(uint32_t number_of_groups){
 
-    string id_file = ConfigFile::get_instance().get_value("data_file");
     string one_line;
     //一个数组，记录每个文件的index
     uint32_t * index = new uint32_t [number_of_groups];
@@ -45,7 +45,7 @@ void process_ids(uint32_t number_of_groups){
     for (int i = 0; i < number_of_groups; ++i) {
         char path[40];
         sprintf(path, "id_map/id_map_%d.data", i);
-        write_map[i].open(path, ofstream::out|ofstream::app);
+        write_map[i].open(path, ofstream::out);
     }
 
 
@@ -129,6 +129,8 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     cout<<"Client:: sending query id's mod_id to server"<<endl;
     net_client.one_time_send((char *)&mod_id, sizeof(mod_id));
 
+    // index = int(ele_idx / ele_per_ptxt), ele_per_ptxt = int(N/ coffs_per_element) = 4096/4 = 1024
+    // coffs_per_element=ceil(8 * 23 / (double) 60) = 4;
     uint64_t index = client.get_fv_index(ele_index, size_per_item);   // index of FV plaintext
     uint64_t offset = client.get_fv_offset(ele_index, size_per_item);  //offset in a plaintext
 
@@ -196,6 +198,99 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
 }
 
+uint64_t * process_batch_ids(){
+    string one_line;
+    uint32_t batch_size =10000;
+    uint64_t * batch_id_array = new uint64_t [batch_size];
+    auto count = 0;
+
+    ifstream query_id(batch_id_file.c_str(), ifstream::in);
+    getline(query_id, one_line); //跳过首行‘id’
+    stringstream id_stream;
+    while(getline(query_id, one_line)) {
+        string one_id = one_line.substr(0, 18);
+        id_stream<<one_id;
+        uint64_t id;
+        id_stream>>id;
+        id_stream.clear();
+        batch_id_set.insert(id);
+        batch_id_array[count] = id;
+        ++count;
+    }
+    query_id.close();
+    cout<<"client::read "<<batch_id_set.size()<< " ids"<<endl;
+    return batch_id_array;
+    cout<<"client::Finishing reading batch_ids:"<<count<<endl;
+}
+
+uint64_t * random_pick() {
+    set<uint64_t> random_id_set; //存储99万random_id
+    uint32_t random_id_size = 990000;
+    uint64_t * random_id_array = new uint64_t[random_id_size];
+    random_device rd;
+
+    uint64_t **group_ids;
+    group_ids = new uint64_t *[number_of_groups];
+
+    uint32_t * id_count = new uint32_t [number_of_groups];  //存储id_count数据
+    cout<<"read id_count"<<endl;
+    ifstream read_count;
+    read_count.open("id_map/count_data.data", ifstream::in);
+    for (int i = 0; i < number_of_groups; ++i) {
+        string mod, mod_count;
+        uint32_t count;
+        read_count>>mod>>mod_count;
+        count = atoi(mod_count.c_str());
+        id_count[i] = count;
+    }
+    read_count.close();
+
+    cout<<"read all ids"<<endl;
+    ifstream read_map[number_of_groups];
+    stringstream id_stream;
+    for (int i = 0; i < number_of_groups; ++i) {
+        char path[40];
+        sprintf(path, "id_map/id_map_%d.data", i);
+        read_map[i].open(path, ifstream::in);
+        uint32_t count = id_count[i];
+        group_ids[i]= new uint64_t[count];
+        string id, index;
+        uint64_t iid;
+        for (int j = 0; j < count; ++j) {
+            uint32_t index = -1;
+            read_map[i]>>id>>index;
+            id_stream << id;
+            id_stream >> iid;
+            group_ids[i][j] = iid;
+            id_stream.clear();
+        }
+        read_map[i].close();
+    }
+
+    uint32_t random_group;
+    uint32_t random_index ;
+    for (int i = 0; i < random_id_size; ++i) {
+        uint64_t random_number;
+
+        //若已在两个set里面存在，重新选取
+        while (true) {
+            random_group = rd() % number_of_groups;
+            random_index = rd() % id_count[random_group];
+            random_number = group_ids[random_group][random_index];
+            if(batch_id_set.count(random_number)==0 and random_id_set.count(random_number)==0) break;
+        }
+        random_id_set.insert(group_ids[random_group][random_index]);
+        random_id_array[i]=group_ids[random_group][random_index];
+    }
+
+    cout<<"client::random id size:"<< random_id_set.size()<<endl;
+
+    for(int i=0; i<number_of_groups; ++i)
+        delete [] group_ids[i];
+    delete [] group_ids;
+    return random_id_array;
+}
+
 int main(int argc, char* argv[]){
     ConfigFile::set_path("client.conf");
     ConfigFile config = ConfigFile::get_instance();
@@ -203,11 +298,12 @@ int main(int argc, char* argv[]){
     if(config.key_exist("logt")) logt = config.get_value_uint32("logt");
     if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
-    /*
-    if (argc<3) {
-        cout<<"Error:needs assign server's ip and port"<<endl;
-        return 0;
-    */
+    if(config.key_exist("id_file")) id_file = config.get_value("id_file");
+    if(config.key_exist("batch_id_file")) batch_id_file = config.get_value("batch_id_file");
+
+    if (argc>1 and argv[1]=="batch") {
+
+    }
 
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
     if(config.key_exist("ip")) ip = config.get_value("ip");

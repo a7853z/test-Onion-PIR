@@ -29,21 +29,19 @@ using namespace seal::util;
 
 void process_datas(uint32_t number_of_groups){
 
-    string id_file = ConfigFile::get_instance().get_value("data_file");
-
     //一个数组，记录每个文件的index
     uint32_t * index = new uint32_t [number_of_groups];
     for (int i = 0; i < number_of_groups; ++i) {
         index[i]=0;
     }
 
-    ifstream query_data(id_file.c_str(), ifstream::in);
+    ifstream query_data(data_file.c_str(), ifstream::in);
 
     ofstream write_map[number_of_groups];
     for (int i = 0; i < number_of_groups; ++i) {
         char path[40];
         sprintf(path, "data_map/data_map_%d.data", i);
-        write_map[i].open(path, ofstream::out|ofstream::app);
+        write_map[i].open(path, ofstream::out);
     }
 
     string one_line;
@@ -283,9 +281,10 @@ int main(int argc, char* argv[]){
     if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
     if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
+    if(config.key_exist("data_file")) = config.get_value("data_file");
+    if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
 
     //pre-process ids
-    if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
     if(process_data) {
         process_datas(number_of_groups);
     }
@@ -295,8 +294,7 @@ int main(int argc, char* argv[]){
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
     gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
-    //
-    cout << "Server: Initializing server." << endl;
+
     pir_server server(parms, pir_params);
     if(process_split_db) { // 为true时不要多线程
         cout<<"Server:: Process all split_db"<<endl;
