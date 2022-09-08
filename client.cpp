@@ -32,7 +32,7 @@ using namespace seal::util;
 typedef vector<Ciphertext> GSWCiphertext;
 set<uint32_t> batch_query_index;
 set<uint64_t> batch_id_set;
-uint64_t batch_query_ids[10000];
+uint64_t * batch_query_ids;
 mutex batch_result_mutex;
 
 void process_ids(uint32_t number_of_groups){
@@ -82,27 +82,23 @@ uint32_t find_index(string query_id, uint32_t number_of_groups, uint32_t &number
     sprintf(path1, "id_map/id_map_%d.data", id_mod);
     ifstream read_map;
     read_map.open(path1, ifstream::in);
-    string id, index1;
+    string id; uint32_t index1;
     uint32_t index = -1;
     while(read_map>>id>>index1){
         if(id == query_id){
-            index = atoi(index1.c_str());
+            index = index1;
             break;
         }
     }
     read_map.close();
 
     ifstream read_count;
-    string mod, mod_count;
-    uint32_t count = -1;
+    uint32_t mod, mod_count=0;
     read_count.open("id_map/count_id.data", ifstream::in);
     while(read_count>>mod>>mod_count){
-        if(id_mod == atoi(mod.c_str())){
-            count = atoi(mod_count.c_str());
-            break;
-        }
+        if(id_mod == mod) break;
     }
-    number_of_items = count;
+    number_of_items = mod_count;
     read_count.close();
 
     cout<<"query_id index:"<<index<<endl;
@@ -203,7 +199,7 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
 }
 
-void handle_one_batch_query(pir_client & client, uint32_t query_index, uint32_t position) {
+void handle_one_batch_query(pir_client * client, uint32_t query_index, uint32_t position) {
 
     NetClient net_client(ip, port);
     net_client.init_client();
@@ -212,7 +208,7 @@ void handle_one_batch_query(pir_client & client, uint32_t query_index, uint32_t 
     cout << "Client:: Query index" << index << endl;
 
     auto time_query_s = high_resolution_clock::now();
-    PirQuery query = client.generate_query_combined(index);
+    PirQuery query = client->generate_query_combined(index);
     cout<<"Client:: query size = "<< query.size()<< endl;
     for (int i = 0; i < query.size(); ++i) {
         cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
@@ -247,7 +243,7 @@ void handle_one_batch_query(pir_client & client, uint32_t query_index, uint32_t 
     string ct_string;
     net_client.one_time_receive(ct_string);
     ct_stream<<ct_string;
-    ct.load(client.newcontext_, ct_stream);
+    ct.load(client->newcontext_, ct_stream);
     ct_stream.clear();
     ct_stream.str("");
     ct_string.clear();
@@ -255,30 +251,35 @@ void handle_one_batch_query(pir_client & client, uint32_t query_index, uint32_t 
     cout<<"Client:: Receiving pir reply from server"<<endl;
     auto time_reply_e = high_resolution_clock::now();
     auto time_reply_us = duration_cast<microseconds>(time_reply_e - time_reply_s).count();
-    cout << "Client: Server reply time: " << time_reply_us / 1000 << " ms" << endl;
+    cout << "Client:: Server reply time: " << time_reply_us / 1000 << " ms" << endl;
 
-    Plaintext rep= client.decrypt_result(reply);
+    Plaintext rep= client->decrypt_result(reply);
 
     // Convert from FV plaintext (polynomial) to database element at the client
     vector<uint8_t> elems(N * logt / 8);
     coeffs_to_bytes(logt, rep, elems.data(), (N * logt) / 8);
 
     uint32_t ele_per_ptxt = elements_per_ptxt(logt, N, size_per_item);
+    uint32_t query_number = ceil(10000/(double)ele_per_ptxt);
+
     char pt[size_per_item];
     uint64_t batch_id;
 
     lock_guard<mutex> lock(batch_result_mutex);
+    ofstream write_batch_result;
     char path[40];
-    path = "batch_query_result.data";
+    sprintf(path, "batch_query_result.data");
     write_batch_result.open(path, ios::out|ios::app);
     for (int i = 0; i < ele_per_ptxt; ++i) {
-        batch_id = batch_query_ids[position*ele_per_ptxt+i]
+        if((position == query_number-1) and i==10000%ele_per_ptxt) break; // last batch_query index
+        batch_id = batch_query_ids[position*ele_per_ptxt+i];
         for (int j = 0; j < size_per_item; ++j) {
             pt[i] = elems[(i * size_per_item) + j];
         }
-        write_batch_query<<batch_id<<" "<<pt<< endl;
+        write_batch_result<<batch_id<<" "<<pt<< endl;
     }
     write_batch_result.close();
+    close(net_client.connect_fd);
 }
 
 
@@ -320,34 +321,28 @@ uint64_t * random_pick() {
     uint32_t * id_count = new uint32_t [number_of_groups];  //存储id_count数据
     cout<<"client::read all groups id_count"<<endl;
     ifstream read_count;
-    read_count.open("id_map/count_data.data", ifstream::in);
+    read_count.open("id_map/count_id.data", ifstream::in);
     for (int i = 0; i < number_of_groups; ++i) {
-        string mod, mod_count;
-        uint32_t count;
+        uint32_t mod, mod_count;
         read_count>>mod>>mod_count;
-        count = atoi(mod_count.c_str());
-        id_count[i] = count;
+        cout<<"id_count"<<i<<":"<<mod_count<<endl;
+        id_count[i] = mod_count;
     }
     read_count.close();
 
     cout<<"client::read all ids"<<endl;
     ifstream read_map[number_of_groups];
-    stringstream id_stream;
     for (int i = 0; i < number_of_groups; ++i) {
         char path[40];
         sprintf(path, "id_map/id_map_%d.data", i);
         read_map[i].open(path, ifstream::in);
         uint32_t count = id_count[i];
         group_ids[i]= new uint64_t[count];
-        string id, index;
+        uint64_t id, index;
         uint64_t iid;
         for (int j = 0; j < count; ++j) {
-            uint32_t index = -1;
             read_map[i]>>id>>index;
-            id_stream << id;
-            id_stream >> iid;
-            group_ids[i][j] = iid;
-            id_stream.clear();
+            group_ids[i][j] = id;
         }
         read_map[i].close();
     }
@@ -381,10 +376,10 @@ void batch_id_index_process() {
     uint64_t * random_pick_ids = random_pick();
     auto ele_per_ptxt = elements_per_ptxt(logt, N, size_per_item);  //1024 = 4096/4
     uint32_t query_number = ceil(10000/(double)ele_per_ptxt);
-    uint32_t ptxt_number = ceil(1000000/(double)ele_per_ptxt);
+    uint32_t ptxt_number = ceil(batch_id_number/(double)ele_per_ptxt);
     ofstream write_batch_query;
     char path[40];
-    path = "batch_query_proprocess.data";
+    sprintf(path, "batch_query_proprocess.data");
     write_batch_query.open(path, ofstream::out);
 
     //生成随机query_index
@@ -399,7 +394,7 @@ void batch_id_index_process() {
     uint32_t current_pt_index;
     uint32_t batch_id_idx = 0;
     uint32_t random_id_idx = 0;
-    for (int i = 0; i < 1000000; ++i) {
+    for (int i = 0; i < batch_id_number; ++i) {
         current_pt_index = i/ele_per_ptxt;
         //取batch_id
         if(batch_query_index.count(current_pt_index)!=0 and batch_id_idx<10000) {
@@ -415,26 +410,25 @@ void batch_id_index_process() {
 }
 
 //
-char * get_batch_query_buffer() {
+void get_batch_query_buffer(char * & buffer) {
     auto ele_per_ptxt = elements_per_ptxt(logt, N, size_per_item);  //1024 = 4096/4
     uint32_t query_number = ceil(10000/(double)ele_per_ptxt);
-    uint32_t ptxt_number = ceil(1000000/(double)ele_per_ptxt);
+    uint32_t ptxt_number = ceil(batch_id_number/(double)ele_per_ptxt);
     set<uint32_t> query_index;
     ifstream query_data("batch_query_proprocess.data", ifstream::in);
     uint32_t index;
     for (int i = 0; i < query_number; ++i) {
         query_data>>index;
     }
-
-    char buffer[1000000*8];  //send 1million 8bytes-id to server in order.
+    //send 1million 8bytes-id to server in order.
     uint64_t id;
     uint32_t offset=0;
-    for (int i = 0; i < 1000000; ++i) {
+    for (int i = 0; i < batch_id_number; ++i) {
         query_data >> id >> index;
         memcpy(buffer+offset, (char*)&id ,sizeof(id));
+        offset += sizeof(id);
     }
     query_data.close();
-    return buffer;
 }
 
 void send_public_params (pir_client &client, NetClient &net_client){
@@ -478,38 +472,54 @@ void send_public_params (pir_client &client, NetClient &net_client){
 }
 
 int handle_batch_query() {
+    cout<<"Client::Begin Batch Query Offline Preprocessing: picking one million random ids include batch query ids" <<endl;
+    auto time_offline_s = high_resolution_clock::now();
+    batch_id_index_process();
+    char * buffer = new char[batch_id_number * 8];
+    get_batch_query_buffer(buffer);
+
+    uint64_t data;
+    memcpy(&data, buffer, sizeof(data));
+    cout<<"one sampel batch id"<<data<<endl;
+
+    uint32_t buffer_size = batch_id_number*8; //1million uint64_t
+    auto time_offline_e = high_resolution_clock::now();
+    auto time_offline_us = duration_cast<microseconds>(time_offline_e - time_offline_s).count();
+    cout << "Client::Batch query offline preprocess time: " << time_offline_us / 1000 << " ms" << endl;
+
+    cout<<"Client::Begin online batch query"<<endl;
     //send public param first
+    auto time_online_s = high_resolution_clock::now();
     NetClient net_client(ip, port);
     net_client.init_client();
     // 初始化加密参数和PIR参数
     PirParams pir_params;
     EncryptionParameters parms(scheme_type::BFV);
     set_bfv_parms(parms);   //N和logt在这里设置
-    gen_params(1000000,  size_per_item, N, logt,
+    gen_params(batch_id_number,  size_per_item, N, logt,
                pir_params);
-
     // Initialize PIR client....
     pir_client client(parms, pir_params);
     send_public_params(client, net_client);
 
-    batch_id_index_process();
-    char * buffer = get_batch_query_buffer();
-    uint32_t buffer_size = 1000000*8; //1million uint64_t
+
     net_client.one_time_send(buffer, buffer_size);
     close(net_client.connect_fd);
     delete buffer;
-    buffer = Null;
+    buffer = nullptr;
     set<uint32_t>::iterator iter;
     uint32_t query_index;
     uint32_t position = 0;
     for (iter = batch_query_index.begin(); iter != batch_query_index.end(); iter++) {
         query_index = *iter;
-        thread t(handle_one_batch_query, client, query_index, position);
+        thread t(handle_one_batch_query, &client, query_index, position);
         position+=1;
         t.join();
     }
-    //write result to file
-
+    auto time_online_e = high_resolution_clock::now();
+    auto time_online_us = duration_cast<microseconds>(time_online_e - time_online_s).count();
+    cout<<"Client::Batch query online preprocess time: " << time_online_us / 1000 << " ms" << endl;
+    cout<<"Client:: Finish batch query, result has been written to batch_query_result.data"<<endl;
     return 1;
 }
 
@@ -528,7 +538,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("ip")) ip = config.get_value("ip");
     if(config.key_exist("port")) port = config.get_value_int("port");
 
-    if (argc>1 and argv[1]=="batch") {
+    if (argc>1 and string(argv[1])=="batch") {
         return handle_batch_query();
     }
 

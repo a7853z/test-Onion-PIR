@@ -21,11 +21,18 @@
 #include "config_file.h"
 #include <cassert>
 #include <sstream>
+#include <set>
+#include <map>
 
 using namespace std;
 using namespace std::chrono;
 using namespace seal;
 using namespace seal::util;
+
+
+set<uint64_t> batch_ids_set;
+map<uint64_t, uint32_t> batch_ids_map;
+map<uint32_t, string> batch_id_data_map;
 
 void process_datas(uint32_t number_of_groups){
 
@@ -144,16 +151,16 @@ void update_item_number(uint32_t id_mod, uint32_t & item_number) {
 bool handle_one_query(ConnData* conn_data, pir_server &server){
     // Recommended values: (logt, d) = (12, 2) or (8, 1).
 
-    string g_string;
+    string id_mod_string;
     uint32_t id_mod; //get from client
     int ret;
-    ret = NetServer::one_time_receive(conn_data, g_string);
+    ret = NetServer::one_time_receive(conn_data, id_mod_string);
     if (ret == -1) return false;
-    memcpy(&id_mod, g_string.c_str(), sizeof(id_mod));
+    memcpy(&id_mod, id_mod_string.c_str(), sizeof(id_mod));
     bool is_preproccessed = (conn_data->last_id_mod==id_mod);
     conn_data->last_id_mod = id_mod;
     cout<<"Server::getting id_mod from client:"<<id_mod<<endl;
-    g_string.clear();
+    id_mod_string.clear();
 
 
     //get query from client
@@ -273,6 +280,172 @@ void handle_connection(int connect_fd) {
     }
 }
 
+void handle_one_batch_query(pir_server * server, int connect_fd) {
+    ConnData* conn_data = new ConnData();
+    conn_data->connect_fd = connect_fd;
+    cout<<"Server:: begin handle one batch query"<<endl;
+    //get query from client
+    PirQuery query;
+    //實際是query維度為2*1 後面擴展為先傳維度，再根據維度接收密文
+    int ret;
+    cout<<"Server:: receive pir_query from client:"<<endl;
+    for (int i = 0; i < 2; ++i) {
+        GSWCiphertext query_ct;
+        Ciphertext ct;
+        stringstream ct_stream;
+        string ct_string;
+        ret = NetServer::one_time_receive(conn_data, ct_string);
+        if (ret == -1) return;
+        ct_stream<<ct_string;
+        ct.load(server->newcontext_, ct_stream);
+        ct_stream.clear();
+        ct_stream.str("");
+        ct_string.clear();
+        query_ct.push_back(ct);
+        query.push_back(query_ct);
+    }
+
+
+    auto time_server_s = high_resolution_clock::now();
+    PirReply reply = server->generate_reply_combined(query, 0); // generate reply and remote it to client
+
+    //發送reply  reply只含有一個密文
+    cout<<"Server:: send pir result to client:"<<endl;
+    Ciphertext ct = reply[0];
+    stringstream ct_stream;
+    uint32_t ct_size = ct.save(ct_stream);
+    string ct_string = ct_stream.str();
+    const char * ct_temp = ct_string.c_str();
+    NetServer::one_time_send(conn_data, ct_temp, ct_size);
+    //清空
+    ct_string.clear();
+    ct_stream.clear();
+    ct_stream.str("");
+    auto time_server_e = high_resolution_clock::now();
+    auto time_server_us = duration_cast<microseconds>(time_server_e - time_server_s).count();
+    cout<<fixed<<setprecision(3)<<"Server:: PIR Reply size:"<<ct_size/1024.0<<"KB"<<endl;
+    cout << "Server:: PIRServer reply generation time: " << time_server_us / 1000 << " ms"
+         << endl;
+    return;
+}
+
+int handle_batch_query() {
+    cout<<"Server::Begin Batch Query Process" <<endl;
+    auto time_batch_query_s = high_resolution_clock::now();
+    //初始化参数，和server
+    PirParams pir_params;
+    EncryptionParameters parms(scheme_type::BFV);
+    set_bfv_parms(parms);   //N和logt在这里设置
+    gen_params(batch_id_number,  size_per_item, N, logt, pir_params);  //number_of_items 100w
+    pir_server server(parms, pir_params);
+    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
+
+    NetServer net_server(ip, port);
+    net_server.init_net_server();
+    int connect_fd = net_server.wait_connection();
+    ConnData* conn_data = new ConnData();
+    conn_data->connect_fd = connect_fd;
+
+    string g_string;
+    int ret;
+    ret = NetServer::one_time_receive(conn_data, g_string);
+    if (ret == -1) return -1;
+    cout<<"received galois keys from client, key length(bytes):"<<g_string.length()<<endl;
+    stringstream g_stream;
+    g_stream<<g_string;
+
+    GaloisKeys server_galois;
+    server_galois.load(server.newcontext_, g_stream);
+    cout << "Server: Setting Galois keys..."<<endl;
+    server.set_galois_key(0, server_galois);
+    //清空stream和string
+    g_string.clear();
+    g_stream.clear();
+    g_stream.str("");
+
+    //get enc_sk from the client
+    GSWCiphertext enc_sk;
+    //get from the client, for query unpacking get top l rows for GSW ciphertext
+    cout<<"receive enc_sk from client:"<<endl;
+    for (int i = 0; i < 14; ++i) {
+        Ciphertext ct;
+        stringstream ct_stream;
+        string ct_string;
+        NetServer::one_time_receive(conn_data, ct_string);
+        ct_stream<<ct_string;
+        ct.load(server.newcontext_, ct_stream);
+        enc_sk.push_back(ct);
+        ct_stream.clear();
+        ct_stream.str("");
+        ct_string.clear();
+    }
+    server.set_enc_sk(enc_sk);
+
+    //receive ids in order
+    string batch_ids_string;
+    NetServer::one_time_receive(conn_data, batch_ids_string);
+    const char * buff = batch_ids_string.c_str();
+    uint64_t id;
+    uint32_t offset = 0;
+    for (int i = 0; i < batch_id_number; ++i) {
+        memcpy(&id, buff+offset, sizeof(id));
+        offset+=sizeof(id);
+        cout<<"read id from client:"<<id<<endl;
+        batch_ids_set.insert(id);
+        batch_ids_map[id] = i;
+    }
+
+    cout<<"Server::begin batch database preprocess"<<endl;
+    //read batch_id's data
+    ifstream query_data(data_file.c_str(), ifstream::in);
+    string one_line;
+    string one_id;
+    string output;
+    getline(query_data, one_line); //跳过首行‘id’
+    uint32_t count=0;
+    stringstream id_stream;
+    uint64_t current_id;
+    uint32_t batch_id_index;
+    for (int i = 0; i < 100000000; ++i) {
+        getline(query_data, one_line);
+        one_id = one_line.substr(0, 18);
+        output = one_line.substr(19, one_line.length());
+        id_stream<<one_id;
+        id_stream>>current_id;
+        id_stream.clear();
+        if(batch_ids_set.find(current_id)!=batch_ids_set.end()) {
+            batch_id_index = batch_ids_map[current_id];//index in batch_ids
+            batch_id_data_map[batch_id_index] = output;
+            count++;
+        }
+        if(count == batch_id_number) break;
+    }
+    query_data.close();
+    //use batch_id and data initialize server's db
+    // Create test database
+    auto db(make_unique<uint8_t[]>(batch_id_number * size_per_item));
+
+
+    for (uint64_t i = 0; i < batch_id_number; i++) {
+        for (uint64_t j = 0; j < size_per_item; j++) {
+//            auto val =  123;
+            db.get()[(i * size_per_item) + j] = batch_id_data_map[i][j];
+            //cout<<db.get()[(i * size_per_item) + j]<<endl;
+        }
+    }
+    server.set_database(move(db), batch_id_number, size_per_item);
+    //plaintext decomposition
+    server.preprocess_database();
+    cout<<"Server::end batch database preprocess"<<endl;
+
+    while (true) {
+        int connect_fd = net_server.wait_connection();
+        thread t(handle_one_batch_query, &server, connect_fd);
+        t.detach();
+    }
+    return 1;
+}
+
 int main(int argc, char* argv[]){
     ConfigFile::set_path("server.conf");
     ConfigFile config = ConfigFile::get_instance();
@@ -281,8 +454,14 @@ int main(int argc, char* argv[]){
     if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
     if(config.key_exist("process_split_db")) process_split_db = config.get_value_bool("process_split_db");
-    if(config.key_exist("data_file")) = config.get_value("data_file");
+    if(config.key_exist("data_file")) data_file = config.get_value("data_file");
     if(config.key_exist("process_data"))  process_data = config.get_value_bool("process_data");
+    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
+    if(config.key_exist("ip")) ip = config.get_value("ip");
+    if(config.key_exist("port")) port = config.get_value_int("port");
+    if (argc>1 and string(argv[1])=="batch") {
+        return handle_batch_query();
+    }
 
     //pre-process ids
     if(process_data) {
@@ -300,11 +479,6 @@ int main(int argc, char* argv[]){
         cout<<"Server:: Process all split_db"<<endl;
         process_split_dbs(server, number_of_groups);
     }
-    delete &server;
-
-    //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
-    if(config.key_exist("ip")) ip = config.get_value("ip");
-    if(config.key_exist("port")) port = config.get_value_int("port");
 
     NetServer net_server(ip, port);
     net_server.init_net_server();

@@ -20,6 +20,7 @@ bool process_split_db=false;
 string batch_id_file = "query_id.csv";
 string id_file = "query_data.csv";
 string data_file = "query_data.csv";
+uint32_t batch_id_number = 1000000;
 
 uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
