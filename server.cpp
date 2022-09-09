@@ -390,7 +390,6 @@ int handle_batch_query() {
     for (int i = 0; i < batch_id_number; ++i) {
         memcpy(&id, buff+offset, sizeof(id));
         offset+=sizeof(id);
-        cout<<"read id from client:"<<id<<endl;
         batch_ids_set.insert(id);
         batch_ids_map[id] = i;
     }
@@ -406,37 +405,53 @@ int handle_batch_query() {
     stringstream id_stream;
     uint64_t current_id;
     uint32_t batch_id_index;
+    bool preprocess = true;
     for (int i = 0; i < 100000000; ++i) {
+        if(!preprocess) break;
         getline(query_data, one_line);
         one_id = one_line.substr(0, 18);
         output = one_line.substr(19, one_line.length());
+        int pad_length = size_per_item-output.length();
+        if (pad_length>0){
+            string pad_str(pad_length,'0');
+            output = output+pad_str;
+        }
         id_stream<<one_id;
         id_stream>>current_id;
         id_stream.clear();
         if(batch_ids_set.find(current_id)!=batch_ids_set.end()) {
             batch_id_index = batch_ids_map[current_id];//index in batch_ids
             batch_id_data_map[batch_id_index] = output;
+            //if(batch_id_index%1000 ==0) cout<<"one picked data:"<<current_id<< " index:" <<batch_id_index<< " data:" <<output<<endl;
             count++;
         }
         if(count == batch_id_number) break;
     }
     query_data.close();
-    //use batch_id and data initialize server's db
-    // Create test database
-    auto db(make_unique<uint8_t[]>(batch_id_number * size_per_item));
 
-
-    for (uint64_t i = 0; i < batch_id_number; i++) {
-        for (uint64_t j = 0; j < size_per_item; j++) {
+    if(preprocess) {
+        //use batch_id and data initialize server's db
+        // Create test database
+        auto db(make_unique<uint8_t[]>(batch_id_number * size_per_item));
+        for (uint32_t i = 0; i < batch_id_number; i++) {
+            for (uint64_t j = 0; j < size_per_item; j++) {
 //            auto val =  123;
-            db.get()[(i * size_per_item) + j] = batch_id_data_map[i][j];
-            //cout<<db.get()[(i * size_per_item) + j]<<endl;
+                db.get()[i * size_per_item + j] = batch_id_data_map[i][j];
+                //cout<<db.get()[(i * size_per_item) + j]<<endl;
+            }
         }
+        server.set_database(move(db), batch_id_number, size_per_item);
+        //plaintext decomposition
+        server.preprocess_database();
+        cout<<"Server::end batch database preprocess"<<endl;
+        //char split_db_file[40];
+        //sprintf(split_db_file, "batch_split_db.bin");
+        //server.write_split_db2disk(split_db_file);
+    } else {
+        //char split_db_file[40];
+        //sprintf(split_db_file, "batch_split_db.bin");
+        //server.read_split_db_from_disk(split_db_file);
     }
-    server.set_database(move(db), batch_id_number, size_per_item);
-    //plaintext decomposition
-    server.preprocess_database();
-    cout<<"Server::end batch database preprocess"<<endl;
 
     while (true) {
         int connect_fd = net_server.wait_connection();

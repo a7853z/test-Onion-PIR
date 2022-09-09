@@ -32,7 +32,7 @@ using namespace seal::util;
 typedef vector<Ciphertext> GSWCiphertext;
 set<uint32_t> batch_query_index;
 set<uint64_t> batch_id_set;
-uint64_t * batch_query_ids;
+uint64_t * batch_query_ids = new uint64_t[10000];
 mutex batch_result_mutex;
 
 void process_ids(uint32_t number_of_groups){
@@ -199,7 +199,13 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
     //cout << "Main: Reply num ciphertexts: " << reply.size() << endl;
 }
 
-void handle_one_batch_query(pir_client * client, uint32_t query_index, uint32_t position) {
+void handle_one_batch_query(pir_client * client, uint32_t query_index) {
+    uint32_t position = 0;
+    set<uint32_t>::iterator iter;
+    for (iter = batch_query_index.begin(); iter != batch_query_index.end() ; iter++) {
+        if(*iter == query_index) break;
+        position++;
+    }
 
     NetClient net_client(ip, port);
     net_client.init_client();
@@ -262,20 +268,22 @@ void handle_one_batch_query(pir_client * client, uint32_t query_index, uint32_t 
     uint32_t ele_per_ptxt = elements_per_ptxt(logt, N, size_per_item);
     uint32_t query_number = ceil(10000/(double)ele_per_ptxt);
 
-    char pt[size_per_item];
-    uint64_t batch_id;
 
-    lock_guard<mutex> lock(batch_result_mutex);
+    //lock_guard<mutex> lock(batch_result_mutex);
+    uint64_t batch_id;
     ofstream write_batch_result;
     char path[40];
     sprintf(path, "batch_query_result.data");
     write_batch_result.open(path, ios::out|ios::app);
+    char pt[size_per_item];
     for (int i = 0; i < ele_per_ptxt; ++i) {
+        //char * pt;
         if((position == query_number-1) and i==10000%ele_per_ptxt) break; // last batch_query index
         batch_id = batch_query_ids[position*ele_per_ptxt+i];
         for (int j = 0; j < size_per_item; ++j) {
-            pt[i] = elems[(i * size_per_item) + j];
+            pt[j]=elems[(i * size_per_item) + j];
         }
+        //cout<<batch_id<<" "<<pt<<endl;
         write_batch_result<<batch_id<<" "<<pt<< endl;
     }
     write_batch_result.close();
@@ -283,10 +291,8 @@ void handle_one_batch_query(pir_client * client, uint32_t query_index, uint32_t 
 }
 
 
-uint64_t * process_batch_ids(){
+void process_batch_ids(uint64_t *& batch_id_array){
     string one_line;
-    uint32_t batch_size =10000;
-    uint64_t * batch_id_array = new uint64_t [batch_size];
     auto count = 0;
 
     ifstream query_id(batch_id_file.c_str(), ifstream::in);
@@ -305,7 +311,6 @@ uint64_t * process_batch_ids(){
     query_id.close();
     cout<<"client::read "<<batch_id_set.size()<< " ids"<<endl;
 
-    return batch_id_array;
     cout<<"client::Finishing reading batch_ids:"<<count<<endl;
 }
 
@@ -372,7 +377,7 @@ uint64_t * random_pick() {
 }
 
 void batch_id_index_process() {
-    batch_query_ids = process_batch_ids();
+    process_batch_ids(batch_query_ids);
     uint64_t * random_pick_ids = random_pick();
     auto ele_per_ptxt = elements_per_ptxt(logt, N, size_per_item);  //1024 = 4096/4
     uint32_t query_number = ceil(10000/(double)ele_per_ptxt);
@@ -416,9 +421,12 @@ void get_batch_query_buffer(char * & buffer) {
     uint32_t ptxt_number = ceil(batch_id_number/(double)ele_per_ptxt);
     set<uint32_t> query_index;
     ifstream query_data("batch_query_proprocess.data", ifstream::in);
+
+    batch_query_index.clear();
     uint32_t index;
     for (int i = 0; i < query_number; ++i) {
         query_data>>index;
+        batch_query_index.insert(index);
     }
     //send 1million 8bytes-id to server in order.
     uint64_t id;
@@ -474,7 +482,13 @@ void send_public_params (pir_client &client, NetClient &net_client){
 int handle_batch_query() {
     cout<<"Client::Begin Batch Query Offline Preprocessing: picking one million random ids include batch query ids" <<endl;
     auto time_offline_s = high_resolution_clock::now();
-    batch_id_index_process();
+
+    if(batch_id_preprocess) {
+        batch_id_index_process();
+    } else {
+        process_batch_ids(batch_query_ids);
+    }
+
     char * buffer = new char[batch_id_number * 8];
     get_batch_query_buffer(buffer);
 
@@ -509,11 +523,9 @@ int handle_batch_query() {
     buffer = nullptr;
     set<uint32_t>::iterator iter;
     uint32_t query_index;
-    uint32_t position = 0;
     for (iter = batch_query_index.begin(); iter != batch_query_index.end(); iter++) {
         query_index = *iter;
-        thread t(handle_one_batch_query, &client, query_index, position);
-        position+=1;
+        thread t(handle_one_batch_query, &client, query_index);
         t.join();
     }
     auto time_online_e = high_resolution_clock::now();
@@ -537,6 +549,8 @@ int main(int argc, char* argv[]){
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
     if(config.key_exist("ip")) ip = config.get_value("ip");
     if(config.key_exist("port")) port = config.get_value_int("port");
+    if(config.key_exist("batch_id_preprocess")) batch_id_preprocess = config.get_value_bool("batch_id_preprocess");
+
 
     if (argc>1 and string(argv[1])=="batch") {
         return handle_batch_query();
