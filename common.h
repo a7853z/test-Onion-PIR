@@ -5,24 +5,27 @@
 #ifndef ONIONPIR_COMMON_H
 #define ONIONPIR_COMMON_H
 
-#endif //ONIONPIR_COMMON_H
-
 #include "SHA256.h"
 
-uint32_t N=4096;
-uint32_t logt=60;
-uint64_t size_per_item=23;
-uint32_t number_of_groups=90;
-string ip = "127.0.0.1";
-int port = 11111;
-bool process_data=false;
-bool process_split_db=false;
-string batch_id_file = "query_id.csv";
-string id_file = "query_data.csv";
-string data_file = "query_data.csv";
-uint32_t batch_id_number = 1000000;
+#include <string>
+using namespace std;
 
-uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
+extern uint32_t N;
+extern uint32_t logt;
+extern uint64_t size_per_item;
+extern uint32_t number_of_groups;
+extern string ip;
+extern int port;
+extern bool process_data;
+extern bool process_split_db;
+extern bool use_memory_db;
+extern float max_memory_db_size;
+extern string batch_id_file = "query_id.csv";
+extern string id_file = "query_data.csv";
+extern string data_file = "query_data.csv";
+extern uint32_t batch_id_number = 1000000;
+
+inline uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
     SHA256 sha;
     sha.update(query_id);
@@ -32,3 +35,4 @@ uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
     delete[] digest;
     return id_mod;
 }
+#endif //ONIONPIR_COMMON_H

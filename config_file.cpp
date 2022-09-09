@@ -58,6 +58,10 @@ uint64_t ConfigFile::get_value_uint64(const string& key) {
     return static_cast<uint64_t>(stoull(key2value[key]));
 }
 
+float ConfigFile::get_value_float(const string& key) {
+    return stof(key2value[key]);
+}
+
 bool ConfigFile::key_exist(const string& key) {
     if(key2value.count(key)==0) {
         return false;

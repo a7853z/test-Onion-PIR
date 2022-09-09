@@ -17,7 +17,7 @@ typedef std::vector<seal::Ciphertext> PirReply;
 
 
 
-class pir_server { // TODO 是否需要处理多线程问题
+class pir_server {
 public:
     pir_server(const seal::EncryptionParameters &params, const PirParams &pir_params);
     void set_galois_key(std::uint32_t client_id, seal::GaloisKeys galkey);
@@ -34,7 +34,8 @@ public:
     std::shared_ptr<seal::SEALContext> newcontext_;
     void updata_pir_params(const PirParams &pirparms);
     void write_split_db2disk(char * split_db_file);
-    void read_split_db_from_disk(char * split_db_file);
+    void read_split_db_from_disk(uint32_t id_mod);
+    void read_split_db_from_cache(uint32_t id_mod);
     void clear_split_db();
 private:
     seal::EncryptionParameters params_; // SEAL parameters
