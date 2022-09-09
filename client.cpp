@@ -330,7 +330,6 @@ uint64_t * random_pick() {
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t mod, mod_count;
         read_count>>mod>>mod_count;
-        cout<<"id_count"<<i<<":"<<mod_count<<endl;
         id_count[i] = mod_count;
     }
     read_count.close();
