@@ -315,8 +315,8 @@ void process_batch_ids(uint64_t *& batch_id_array){
 }
 
 uint64_t * random_pick() {
-    set<uint64_t> random_id_set; //存储99万random_id
-    uint32_t random_id_size = 990000;
+    set<uint64_t> random_id_set; //存储109万random_id
+    uint32_t random_id_size = batch_id_number-10000;
     uint64_t * random_id_array = new uint64_t[random_id_size];
     random_device rd;
 
@@ -330,7 +330,6 @@ uint64_t * random_pick() {
     for (int i = 0; i < number_of_groups; ++i) {
         uint32_t mod, mod_count;
         read_count>>mod>>mod_count;
-        cout<<"id_count"<<i<<":"<<mod_count<<endl;
         id_count[i] = mod_count;
     }
     read_count.close();
