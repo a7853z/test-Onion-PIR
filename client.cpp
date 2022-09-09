@@ -315,8 +315,8 @@ void process_batch_ids(uint64_t *& batch_id_array){
 }
 
 uint64_t * random_pick() {
-    set<uint64_t> random_id_set; //存储99万random_id
-    uint32_t random_id_size = 990000;
+    set<uint64_t> random_id_set; //存储109万random_id
+    uint32_t random_id_size = batch_id_number-10000;
     uint64_t * random_id_array = new uint64_t[random_id_size];
     random_device rd;
 
