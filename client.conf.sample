@@ -13,3 +13,6 @@ process_data = false
 process_split_db = false
 # 批查询
 batch_id_file = query_id.csv
+
+#
+batch_id_preprocess = true

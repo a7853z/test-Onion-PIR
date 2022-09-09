@@ -19,7 +19,7 @@ int NetServer::init_net_server() {
     int ret;
     ret = bind(listen_fd,(struct sockaddr*)&server_addr,sizeof(server_addr));
     if(ret == -1) {
-        cout<<"net_server::SERVER: bind error"<<endl;
+        cout<<"net_server:: bind error"<<endl;
         return -1;
     }else {
         cout<<"SERVER: bind success"<<endl;
@@ -27,12 +27,11 @@ int NetServer::init_net_server() {
 
     ret = listen(listen_fd, 128);
     if(ret == -1) {
-        cout<<"net_server::SERVER: listen error"<<endl;
+        cout<<"net_server:: listen error"<<endl;
         return -1;
     }
-    cout<<"net_server::SERVER: listen success, listen fd:"<<listen_fd<<endl;
+    cout<<"net_server:: listen success, listen fd:"<<listen_fd<<endl;
     char client_ip[20];
-    cout<<"net_server::listen_fd:"<<listen_fd<<endl;
     return 0;
 }
 
