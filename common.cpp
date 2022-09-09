@@ -10,7 +10,6 @@ bool process_data=false;
 bool process_split_db=false;
 bool use_memory_db=false;
 float max_memory_db_size=16.0; // 单位为GB
-bool batch_id_preprocess = true;
 string batch_id_file = "query_id.csv";
 string id_file = "query_data.csv";
 string data_file = "query_data.csv";
