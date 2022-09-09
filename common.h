@@ -20,10 +20,11 @@ extern bool process_data;
 extern bool process_split_db;
 extern bool use_memory_db;
 extern float max_memory_db_size;
-extern string batch_id_file = "query_id.csv";
-extern string id_file = "query_data.csv";
-extern string data_file = "query_data.csv";
-extern uint32_t batch_id_number = 1000000;
+extern string batch_id_file;
+extern string id_file;
+extern string data_file;
+extern uint32_t batch_id_number;
+extern bool batch_id_preprocess;
 
 inline uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
