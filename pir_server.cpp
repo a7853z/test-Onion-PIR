@@ -39,9 +39,9 @@ pir_server::set_database(const unique_ptr<const uint8_t[]> &bytes, uint64_t ele_
     // number of FV plaintexts needed to create the d-dimensional matrix
     uint64_t prod = 1;
     for (uint32_t i = 0; i < pir_params_.nvec.size(); i++) {
-        cout<<"nevc["<<i<<"]:"<<pir_params_.nvec[i]<<endl;
+        //cout<<"nevc["<<i<<"]:"<<pir_params_.nvec[i]<<endl;
         prod *= pir_params_.nvec[i];
-        cout<<"prod:"<<prod<<endl;
+        //cout<<"prod:"<<prod<<endl;
     }
 
 
@@ -118,7 +118,7 @@ pir_server::set_database(const unique_ptr<const uint8_t[]> &bytes, uint64_t ele_
          << (matrix_plaintexts - current_plaintexts) * elements_per_ptxt(logtp, N, ele_size)
          << " elements)" << endl;
 #endif
-    cout<<"begin padding, matrix number:"<<matrix_plaintexts<<" current number:"<< current_plaintexts<<endl;
+    //cout<<"begin padding, matrix number:"<<matrix_plaintexts<<" current number:"<< current_plaintexts<<endl;
     vector<uint64_t> padding(N, 1);
 
     for (uint64_t i = 0; i < (matrix_plaintexts - current_plaintexts); i++) {
