@@ -467,6 +467,18 @@ int main(int argc, char* argv[]){
     ensure_dir("id_map");
     ensure_dir("data_map");
     ensure_dir("split_db");
+    if (!path_exists(id_file.c_str())) {
+        cerr << id_file << " not exists!" << endl;
+        return -1;
+    }
+    if (!path_exists(data_file.c_str())) {
+        cerr << data_file << " not exists!" << endl;
+        return -1;
+    }
+    if (!path_exists(batch_id_file.c_str())) {
+        cerr << batch_id_file << " not exists!" << endl;
+        return -1;
+    }
 
     ConfigFile::set_path("server.conf");
     ConfigFile config = ConfigFile::get_instance();
