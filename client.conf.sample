@@ -1,18 +1,20 @@
+# 同态加密参数
 N = 4096
 logt = 60
 # 每条记录需要的占用23字节
 size_per_item = 23
+# id分组个数，需保证每个group都有百万以上规模的id
 number_of_groups = 90
+#需要连接服务器的ip及端口
 ip = 127.0.0.1
 port = 11111
-# 数据文件目录
-data_file = query_data.csv
-# 处理数据
-process_data = false
-# 处理split_db
-process_split_db = false
+# 待查询id数据集文件
+id_file = query_data.csv
+
+# 是否处理id，按id哈希值生成多组id->index
+process_id = false
+
 # 批查询
 batch_id_file = query_id.csv
-
-#
+#预处理batch_id,生成包含batch_id的一组随机id
 batch_id_preprocess = true

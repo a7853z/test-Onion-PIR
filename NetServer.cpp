@@ -66,7 +66,7 @@ int NetServer::one_time_receive(ConnData* conn_data, string &message){
         return -1;
     }
     memcpy(&size, conn_data->buffer, sizeof(size));
-    cout<<"net_server: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
+    //cout<<"net_server: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
 
     size-=(recv_bytes-sizeof(size));
 

@@ -141,10 +141,11 @@ void one_time_query(pir_client &client, NetClient &net_client, string query_id){
 
     auto time_query_s = high_resolution_clock::now();
     PirQuery query = client.generate_query_combined(index);
+    /*
     cout<<"Client:: query size = "<< query.size()<< endl;
     for (int i = 0; i < query.size(); ++i) {
         cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
-    }
+    }*/
     cout<<"Client:: sending pir query to server"<<endl;
     //传query给server，传两个密文
     int query_size=0;
@@ -479,7 +480,7 @@ void send_public_params (pir_client &client, NetClient &net_client){
 }
 
 int handle_batch_query() {
-    cout<<"Client::Begin Batch Query Offline Preprocessing: picking one million random ids include batch query ids" <<endl;
+    cout<<"Client::Begin Batch Query Offline Preprocessing: picking 110w random ids include batch query ids" <<endl;
     auto time_offline_s = high_resolution_clock::now();
 
     if(batch_id_preprocess) {
@@ -530,7 +531,7 @@ int handle_batch_query() {
     auto time_online_e = high_resolution_clock::now();
     auto time_online_us = duration_cast<microseconds>(time_online_e - time_online_s).count();
     cout<<"Client::Batch query online preprocess time: " << time_online_us / 1000 << " ms" << endl;
-    cout<<"Client:: Finish batch query, result has been written to batch_query_result.data"<<endl;
+    cout<<"Client::Finish batch query, result has been written to batch_query_result.data"<<endl;
     return 1;
 }
 
@@ -543,6 +544,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("size_per_item")) size_per_item = config.get_value_uint64("size_per_item");
     if(config.key_exist("number_of_groups")) number_of_groups = config.get_value_uint32("number_of_groups");
     if(config.key_exist("id_file")) id_file = config.get_value("id_file");
+    if(config.key_exist("process_id")) process_id = config.get_value_bool("process_id");
     if(config.key_exist("batch_id_file")) batch_id_file = config.get_value("batch_id_file");
 
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
@@ -561,7 +563,6 @@ int main(int argc, char* argv[]){
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
 
     //pre-process ids
-    bool process_id = false;
     if(process_id) {
         process_ids(number_of_groups);
     }

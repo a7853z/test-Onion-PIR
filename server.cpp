@@ -481,9 +481,10 @@ int main(int argc, char* argv[]){
     if (argc>1 and string(argv[1])=="batch") {
         return handle_batch_query();
     }
-
+    cout<<"Server::start server!"<<endl;
     //pre-process ids
     if(process_data) {
+        cout<<"Server::process query data!"<<endl;
         process_datas(number_of_groups);
     }
 
@@ -493,8 +494,6 @@ int main(int argc, char* argv[]){
         EncryptionParameters parms(scheme_type::BFV);
         set_bfv_parms(parms);   //N和logt在这里设置
         gen_params(0,  size_per_item, N, logt, pir_params);  //number_of_items 初始0
-        //
-        cout << "Server: Initializing server." << endl;
         pir_server server(parms, pir_params);
         cout<<"Server:: Process all split_db"<<endl;
         process_split_dbs(server, number_of_groups);

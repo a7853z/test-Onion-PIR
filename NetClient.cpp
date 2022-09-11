@@ -36,7 +36,7 @@ int NetClient::one_time_receive(string &message){
     uint32_t size;
     recv_bytes = recv(connect_fd, buffer, sizeof(buffer), 0);
     memcpy(&size, buffer, sizeof(size));
-    cout<<"net_client:: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
+    //cout<<"net_client:: received bytes:"<<recv_bytes<<" packet length:"<<size<<endl;
 
     size-=(recv_bytes-sizeof(size));
 
@@ -51,7 +51,7 @@ int NetClient::one_time_receive(string &message){
         memset(&buffer, 0, sizeof(buffer));
         recv_bytes = recv(connect_fd, buffer, sizeof(buffer), 0);
         //buffer[recv_bytes]='\0';
-        cout<<"received bytes:"<<recv_bytes<<endl;
+        //cout<<"received bytes:"<<recv_bytes<<endl;
 
         //when recv_bytes==BUFFER_SIZE 导致 extra char
         string temp1(buffer, recv_bytes);

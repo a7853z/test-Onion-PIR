@@ -163,7 +163,7 @@ std::vector<std::uint64_t> bytes_to_coeffs(std::uint64_t limit, const std::uint8
 
 vector<uint64_t> compute_indices(uint64_t desiredIndex, vector<uint64_t> Nvec) {
     for (int i = 0; i < Nvec.size(); ++i) {
-        cout<<"Nvec["<<i<<"]:"<<Nvec[i]<<endl;
+        //cout<<"Nvec["<<i<<"]:"<<Nvec[i]<<endl;
     }
 
     uint32_t num = Nvec.size();
@@ -185,7 +185,7 @@ vector<uint64_t> compute_indices(uint64_t desiredIndex, vector<uint64_t> Nvec) {
         j -= ji * product;
     }
     for (int k = 0; k < result.size(); ++k) {
-        cout<<"result["<<k<<"]:"<<result[k]<<endl;
+        //cout<<"result["<<k<<"]:"<<result[k]<<endl;
     }
 
     return result;

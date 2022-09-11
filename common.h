@@ -22,6 +22,7 @@ extern bool use_memory_db;
 extern float max_memory_db_size;
 extern string batch_id_file;
 extern string id_file;
+extern bool process_id;
 extern string data_file;
 extern uint32_t batch_id_number;
 extern bool batch_id_preprocess;
