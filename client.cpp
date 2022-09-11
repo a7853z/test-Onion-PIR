@@ -537,6 +537,10 @@ int handle_batch_query() {
 
 
 int main(int argc, char* argv[]){
+    ensure_dir("id_map");
+    ensure_dir("data_map");
+    ensure_dir("split_db");
+
     ConfigFile::set_path("client.conf");
     ConfigFile config = ConfigFile::get_instance();
     if(config.key_exist("N")) N = config.get_value_uint32("N");

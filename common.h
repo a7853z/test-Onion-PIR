@@ -8,6 +8,8 @@
 #include "SHA256.h"
 
 #include <string>
+#include <unistd.h> // linux only
+#include <sys/stat.h> // linux only
 using namespace std;
 
 extern uint32_t N;
@@ -37,4 +39,13 @@ inline uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
     delete[] digest;
     return id_mod;
 }
+
+// 如果目录没创建，创建它
+inline void ensure_dir(const char *path)
+{
+    if (access(path, F_OK) == -1) {
+        mkdir(path, 0755);
+    }
+}
+
 #endif //ONIONPIR_COMMON_H
