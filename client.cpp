@@ -217,9 +217,11 @@ void handle_one_batch_query(pir_client * client, uint32_t query_index) {
     auto time_query_s = high_resolution_clock::now();
     PirQuery query = client->generate_query_combined(index);
     cout<<"Client:: query size = "<< query.size()<< endl;
+    /*
     for (int i = 0; i < query.size(); ++i) {
         cout<<"query["<<i<<"] size:"<<query[i].size()<<endl;
     }
+     */
     cout<<"Client:: sending one batch pir query to server"<<endl;
     //传query给server，传两个密文
     int query_size=0;
@@ -539,11 +541,7 @@ int handle_batch_query() {
 int main(int argc, char* argv[]){
     ensure_dir("id_map");
     if (!path_exists(id_file.c_str())) {
-        cerr << id_file << " not exists!" << endl;
-        return -1;
-    }
-    if (!path_exists(batch_id_file.c_str())) {
-        cerr << batch_id_file << " not exists!" << endl;
+        cerr << "error:: id file "<< id_file << " not exists!" << endl;
         return -1;
     }
 
@@ -564,6 +562,10 @@ int main(int argc, char* argv[]){
 
 
     if (argc>1 and string(argv[1])=="batch") {
+        if (!path_exists(batch_id_file.c_str())) {
+            cerr << "error:: batch_id_file " <<batch_id_file << " not exists!" << endl;
+            return -1;
+        }
         return handle_batch_query();
     }
 
@@ -574,6 +576,7 @@ int main(int argc, char* argv[]){
 
     //pre-process ids
     if(process_id) {
+        cout<<"Client::begin process ids"<<endl;
         process_ids(number_of_groups);
     }
 

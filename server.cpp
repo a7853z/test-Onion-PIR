@@ -467,7 +467,7 @@ int main(int argc, char* argv[]){
     ensure_dir("data_map");
     ensure_dir("split_db");
     if (!path_exists(data_file.c_str())) {
-        cerr << data_file << " not exists!" << endl;
+        cerr << "error::data file " <<data_file << " not exists!" << endl;
         return -1;
     }
 
