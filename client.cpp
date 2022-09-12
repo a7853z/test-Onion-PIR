@@ -532,7 +532,7 @@ int handle_batch_query() {
     }
     auto time_online_e = high_resolution_clock::now();
     auto time_online_us = duration_cast<microseconds>(time_online_e - time_online_s).count();
-    cout<<"Client::Batch query online preprocess time: " << time_online_us / 1000 << " ms" << endl;
+    cout<<"Client::Batch query online time: " << time_online_us / 1000 << " ms" << endl;
     cout<<"Client::Finish batch query, result has been written to batch_query_result.data"<<endl;
     return 1;
 }
