@@ -28,6 +28,7 @@ extern bool process_id;
 extern string data_file;
 extern uint32_t batch_id_number;
 extern bool batch_id_preprocess;
+extern bool sync_ids;
 
 inline uint32_t get_id_mod(string query_id, uint32_t number_of_groups)
 {
