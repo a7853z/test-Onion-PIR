@@ -18,3 +18,5 @@ process_id = false
 batch_id_file = query_id.csv
 #预处理batch_id,生成包含batch_id的一组随机id
 batch_id_preprocess = true
+#是否从server同步id信息
+sync_ids = false

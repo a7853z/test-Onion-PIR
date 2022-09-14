@@ -81,6 +81,50 @@ void process_datas(uint32_t number_of_groups){
     }
 }
 
+void sync_id_index(ConnData* conn_data){
+
+    //一个数组，记录每个文件的index
+    ifstream read_count;
+    uint32_t mod, mod_count;
+    uint32_t max_count = 0;
+    char * count_buffer = new char[number_of_groups * sizeof(mod_count)];
+    read_count.open("data_map/count_data.data", ifstream::in);
+    uint32_t size=0;
+    while(read_count>>mod>>mod_count){
+        if(mod_count>max_count) {
+            max_count = mod_count;
+        }
+        memcpy(count_buffer+size, (char*)&mod_count ,sizeof(mod_count));
+        size += sizeof(mod_count);
+    }
+    read_count.close();
+
+    NetServer::one_time_send(conn_data, count_buffer, size);
+
+
+    ifstream read_data;
+    uint64_t id;
+    char * buffer = new char[max_count*sizeof(id)];
+    uint32_t index;
+    string data;
+    size = 0;
+    //读取各个组id->index 映射，并发送给client
+    for (int i = 0; i < number_of_groups; ++i) {
+        char path[40];
+        sprintf(path, "data_map/data_map_%d.data", i);
+        read_data.open(path, ofstream::in);
+        while (read_data>>id>>index>>data) {
+            memcpy(buffer+size, (char*)&id ,sizeof(id));
+            size+=sizeof(id);
+        }
+        NetServer::one_time_send(conn_data, buffer, size);
+        size = 0;
+        read_data.close();
+    }
+    delete[] buffer;
+    delete[] count_buffer;
+}
+
 unique_ptr<uint8_t[]> load_data(uint32_t id_mod, uint32_t item_size, uint32_t & item_number){
     cout << "Server: load data for id_mod:" << id_mod << endl;
 
@@ -242,6 +286,14 @@ void handle_connection(int connect_fd) {
     //
     cout << "Server: Initializing server for a Client, Client connect_fd:"<<connect_fd << endl;
     pir_server server(parms, pir_params);
+
+    string sync_id_string;
+    NetServer::one_time_receive(conn_data, sync_id_string);
+    const char * buff = sync_id_string.c_str();
+    memcpy(&sync_ids, buff, sizeof(sync_ids));
+    if(sync_ids) {
+        sync_id_index(conn_data);
+    }
 
     string g_string;
     int ret;
@@ -485,6 +537,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("port")) port = config.get_value_int("port");
     if(config.key_exist("use_memory_db")) use_memory_db = config.get_value_bool("use_memory_db");
     if(config.key_exist("max_memory_db_size")) max_memory_db_size = config.get_value_float("max_memory_db_size");
+    if(config.key_exist("sync_ids")) sync_ids = config.get_value_bool("sync_ids");
     if (argc>1 and string(argv[1])=="batch") {
         return handle_batch_query();
     }

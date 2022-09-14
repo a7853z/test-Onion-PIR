@@ -73,6 +73,50 @@ void process_ids(uint32_t number_of_groups){
     cout<<"Finishing process ids"<<endl;
 }
 
+void sync_id_from_server(NetClient & net_client){
+    //接收count_id数据
+    cout << "Client::Begin sync ids from server." <<endl;
+    string count_id_string;
+    net_client.one_time_receive(count_id_string);
+    const char * buff = count_id_string.c_str();
+    uint32_t count;
+    uint32_t offset = 0;
+    ofstream count_id;
+    count_id.open("id_map/count_id.data");
+    for (int i = 0; i < number_of_groups; ++i) {
+        memcpy(&count, buff+offset, sizeof(count));
+        count_id<< i << " " << count<<endl;
+        offset += sizeof(count);
+    }
+    count_id.close();
+
+    ofstream write_map[number_of_groups];
+    for (int i = 0; i < number_of_groups; ++i) {
+        char path[40];
+        sprintf(path, "id_map/id_map_%d.data", i);
+        write_map[i].open(path, ofstream::out);
+    }
+
+    string id_string;
+    uint64_t id;
+    for (int i = 0; i < number_of_groups; ++i) {
+        net_client.one_time_receive(id_string);
+        const char * buff = id_string.c_str();
+        uint32_t message_length = id_string.length();
+        uint32_t id_count = message_length / sizeof(id);
+        uint32_t offset = 0;
+        for (int j = 0; j < id_count; ++j) {
+            memcpy(&id, buff+offset, sizeof(id));
+            write_map[i]<<id<<" "<<j<<endl;
+            offset += sizeof(id);
+        }
+        id_string.clear();
+        write_map[i].close();
+    }
+
+    cout<<"Client::Finish sync ids from server"<<endl;
+}
+
 //返回query_id在文件中的index，并给number_of_items赋值
 uint32_t find_index(string query_id, uint32_t number_of_groups, uint32_t &number_of_items){
     uint32_t id_mod = get_id_mod(query_id, number_of_groups);
@@ -554,6 +598,7 @@ int main(int argc, char* argv[]){
     if(config.key_exist("id_file")) id_file = config.get_value("id_file");
     if(config.key_exist("process_id")) process_id = config.get_value_bool("process_id");
     if(config.key_exist("batch_id_file")) batch_id_file = config.get_value("batch_id_file");
+    if(config.key_exist("sync_ids")) sync_ids = config.get_value_bool("sync_ids");
 
     //从conf文件获取 ip和port, 否则默认值127.0.0.1：11111
     if(config.key_exist("ip")) ip = config.get_value("ip");
@@ -575,10 +620,20 @@ int main(int argc, char* argv[]){
     uint32_t number_of_items = 0;  //百万不可区分度， 具体需要从服务器获取
 
     //pre-process ids
+    /*
     if(process_id) {
         cout<<"Client::begin process ids"<<endl;
         process_ids(number_of_groups);
+    }*/
+
+    char * buffer = new char[10];
+    memcpy(buffer, (char *)&sync_ids, sizeof(sync_ids));
+    net_client.one_time_send(buffer, sizeof(sync_ids));
+    if(sync_ids) {
+        sync_id_from_server(net_client);
     }
+
+
 
     // 初始化加密参数和PIR参数
     PirParams pir_params;
